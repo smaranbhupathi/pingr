@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS alert_subscriptions;
+DROP TABLE IF EXISTS alert_channels;
+DROP TABLE IF EXISTS incidents;
+DROP TABLE IF EXISTS monitor_checks_2027_h1;
+DROP TABLE IF EXISTS monitor_checks_2026_h2;
+DROP TABLE IF EXISTS monitor_checks_2026_h1;
+DROP TABLE IF EXISTS monitor_checks;
+DROP TABLE IF EXISTS monitors;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS plans;
