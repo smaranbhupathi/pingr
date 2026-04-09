@@ -38,19 +38,21 @@ type AuthServiceConfig struct {
 }
 
 type authService struct {
-	users  outbound.UserRepository
-	plans  outbound.PlanRepository
-	email  outbound.EmailSender
-	config AuthServiceConfig
+	users         outbound.UserRepository
+	plans         outbound.PlanRepository
+	alertChannels outbound.AlertChannelRepository
+	email         outbound.EmailSender
+	config        AuthServiceConfig
 }
 
 func NewAuthService(
 	users outbound.UserRepository,
 	plans outbound.PlanRepository,
+	alertChannels outbound.AlertChannelRepository,
 	email outbound.EmailSender,
 	config AuthServiceConfig,
 ) inbound.AuthService {
-	return &authService{users: users, plans: plans, email: email, config: config}
+	return &authService{users: users, plans: plans, alertChannels: alertChannels, email: email, config: config}
 }
 
 func (s *authService) Register(ctx context.Context, input inbound.RegisterInput) error {
@@ -90,6 +92,19 @@ func (s *authService) Register(ctx context.Context, input inbound.RegisterInput)
 
 	if err := s.users.Create(ctx, user); err != nil {
 		return fmt.Errorf("create user: %w", err)
+	}
+
+	// Auto-create default email alert channel so new users get alerts immediately
+	defaultChannel := &domain.AlertChannel{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		Type:      domain.AlertChannelEmail,
+		Config:    map[string]any{"email": user.Email},
+		IsDefault: true,
+		CreatedAt: time.Now(),
+	}
+	if err := s.alertChannels.Create(ctx, defaultChannel); err != nil {
+		return fmt.Errorf("create default alert channel: %w", err)
 	}
 
 	return s.email.SendVerification(ctx, user.Email, verifyToken)

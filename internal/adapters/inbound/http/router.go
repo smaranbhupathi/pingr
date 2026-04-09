@@ -13,6 +13,7 @@ import (
 func NewRouter(
 	authH *handler.AuthHandler,
 	monitorH *handler.MonitorHandler,
+	userH *handler.UserHandler,
 	jwtSecret string,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -45,6 +46,17 @@ func NewRouter(
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(middleware.Authenticate(jwtSecret))
 
+		// Current user
+		r.Get("/me", userH.Me)
+
+		// Alert channels
+		r.Route("/alert-channels", func(r chi.Router) {
+			r.Get("/", userH.ListAlertChannels)
+			r.Post("/", userH.CreateAlertChannel)
+			r.Delete("/{id}", userH.DeleteAlertChannel)
+		})
+
+		// Monitors
 		r.Route("/monitors", func(r chi.Router) {
 			r.Get("/", monitorH.List)
 			r.Post("/", monitorH.Create)
@@ -52,6 +64,7 @@ func NewRouter(
 			r.Patch("/{id}", monitorH.Update)
 			r.Delete("/{id}", monitorH.Delete)
 			r.Get("/{id}/graph", monitorH.ResponseTimeGraph)
+			r.Post("/{id}/subscribe", userH.SubscribeMonitorToChannel)
 		})
 	})
 

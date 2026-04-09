@@ -43,12 +43,18 @@ func (h *MonitorHandler) Create(w http.ResponseWriter, r *http.Request) {
 		body.IntervalSeconds = 60 // sensible default
 	}
 
-	monitor, err := h.monitors.Create(r.Context(), inbound.CreateMonitorInput{
+	createInput := inbound.CreateMonitorInput{
 		UserID:          userID,
 		Name:            body.Name,
 		URL:             body.URL,
 		IntervalSeconds: body.IntervalSeconds,
-	})
+	}
+	if errs := createInput.Validate(); len(errs) > 0 {
+		JSON(w, http.StatusUnprocessableEntity, map[string]any{"errors": errs})
+		return
+	}
+
+	monitor, err := h.monitors.Create(r.Context(), createInput)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrMonitorLimitReached):

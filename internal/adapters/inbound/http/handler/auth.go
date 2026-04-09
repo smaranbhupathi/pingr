@@ -24,6 +24,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if errs := input.Validate(); len(errs) > 0 {
+		JSON(w, http.StatusUnprocessableEntity, map[string]any{"errors": errs})
+		return
+	}
+
 	if err := h.auth.Register(r.Context(), input); err != nil {
 		switch {
 		case errors.Is(err, services.ErrEmailTaken):
@@ -43,6 +48,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var input inbound.LoginInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if errs := input.Validate(); len(errs) > 0 {
+		JSON(w, http.StatusUnprocessableEntity, map[string]any{"errors": errs})
 		return
 	}
 

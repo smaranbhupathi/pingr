@@ -54,3 +54,8 @@ type AlertChannelRepository interface {
 	GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.AlertChannel, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
+
+type AlertSubscriptionRepository interface {
+	Create(ctx context.Context, sub *domain.AlertSubscription) error
+	DeleteByMonitorAndChannel(ctx context.Context, monitorID, channelID uuid.UUID) error
+}

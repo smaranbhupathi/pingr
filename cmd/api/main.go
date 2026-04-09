@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	inboundhttp "github.com/smaranbhupathi/pingr/internal/adapters/inbound/http"
@@ -25,23 +24,21 @@ func main() {
 		log.Println("no .env file, using environment variables")
 	}
 
-	db, err := pgxpool.New(context.Background(), mustEnv("DATABASE_URL"))
+	db, err := postgres.Connect(context.Background(), mustEnv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("connect db: %v", err)
 	}
 	defer db.Close()
-
-	if err := db.Ping(context.Background()); err != nil {
-		log.Fatalf("ping db: %v", err)
-	}
 	log.Println("database connected")
 
-	// Wire outbound adapters
-	userRepo := postgres.NewUserRepository(db)
-	planRepo := postgres.NewPlanRepository(db)
-	monitorRepo := postgres.NewMonitorRepository(db)
-	checkRepo := postgres.NewCheckRepository(db)
-	incidentRepo := postgres.NewIncidentRepository(db)
+	// Outbound adapters
+	userRepo         := postgres.NewUserRepository(db)
+	planRepo         := postgres.NewPlanRepository(db)
+	monitorRepo      := postgres.NewMonitorRepository(db)
+	checkRepo        := postgres.NewCheckRepository(db)
+	incidentRepo     := postgres.NewIncidentRepository(db)
+	alertChannelRepo := postgres.NewAlertChannelRepository(db)
+	alertSubRepo     := postgres.NewAlertSubscriptionRepository(db)
 
 	emailSender := email.NewEmailSender(
 		mustEnv("RESEND_API_KEY"),
@@ -49,21 +46,22 @@ func main() {
 		mustEnv("APP_BASE_URL"),
 	)
 
-	// Wire core services (inbound ports)
-	authSvc := services.NewAuthService(userRepo, planRepo, emailSender, services.AuthServiceConfig{
+	// Core services
+	authSvc := services.NewAuthService(userRepo, planRepo, alertChannelRepo, emailSender, services.AuthServiceConfig{
 		JWTSecret:            mustEnv("JWT_SECRET"),
 		AccessTokenDuration:  15 * time.Minute,
 		RefreshTokenDuration: 7 * 24 * time.Hour,
 		AppBaseURL:           mustEnv("APP_BASE_URL"),
 	})
-
 	monitorSvc := services.NewMonitorService(monitorRepo, checkRepo, incidentRepo, userRepo, planRepo)
+	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo)
 
-	// Wire inbound HTTP handlers
-	authH := handler.NewAuthHandler(authSvc)
+	// HTTP handlers
+	authH    := handler.NewAuthHandler(authSvc)
 	monitorH := handler.NewMonitorHandler(monitorSvc)
+	userH    := handler.NewUserHandler(userSvc)
 
-	router := inboundhttp.NewRouter(authH, monitorH, mustEnv("JWT_SECRET"))
+	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"))
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{
@@ -74,7 +72,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
