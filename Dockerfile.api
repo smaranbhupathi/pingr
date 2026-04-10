@@ -1,6 +1,6 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
 # Start from the official Go image. This is big (~600MB) but only used to compile.
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Set the working directory inside the container.
 WORKDIR /app
