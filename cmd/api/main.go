@@ -14,6 +14,7 @@ import (
 
 	inboundhttp "github.com/smaranbhupathi/pingr/internal/adapters/inbound/http"
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/handler"
+	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/ratelimit"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
@@ -72,10 +73,15 @@ func main() {
 	monitorH := handler.NewMonitorHandler(monitorSvc, log)
 	userH    := handler.NewUserHandler(userSvc, log)
 
-	// ALLOWED_ORIGIN controls CORS. Use "*" in dev (set in .env).
-	// In prod set it to your exact frontend URL: "https://pingr.yourdomain.com"
+	// Rate limiter — in-memory sliding window.
+	// To switch to Redis: replace NewMemoryStore() with NewRedisStore(redisClient).
+	// Everything else (router, middleware, config) stays the same.
+	rlStore := ratelimit.NewMemoryStore()
+	defer rlStore.Close()
+	log.Info("rate limiter initialised", "store", "memory")
+
 	allowedOrigin := envOr("ALLOWED_ORIGIN", "*")
-	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"), allowedOrigin, log)
+	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"), allowedOrigin, rlStore, log)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

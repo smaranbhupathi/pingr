@@ -9,6 +9,7 @@ import (
 
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/handler"
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/middleware"
+	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/ratelimit"
 )
 
 func NewRouter(
@@ -17,14 +18,19 @@ func NewRouter(
 	userH *handler.UserHandler,
 	jwtSecret string,
 	allowedOrigin string,
+	rlStore ratelimit.Store,
 	log *slog.Logger,
 ) http.Handler {
 	r := chi.NewRouter()
 
+	// RealIP must run first — it sets r.RemoteAddr to the real client IP
+	// by unwrapping X-Forwarded-For. The rate limiter reads r.RemoteAddr,
+	// so this order matters.
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.RequestLogger(log))
 	r.Use(corsMiddleware(allowedOrigin))
+	r.Use(ratelimit.Middleware(rlStore))
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
