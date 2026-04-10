@@ -28,19 +28,19 @@ var Routes = map[string]RouteLimit{
 
 	// Login: 10 attempts per minute per IP.
 	// An attacker trying common passwords would be blocked after 10 tries.
-	"/api/v1/auth/login": {Limit: 10, Window: time.Minute},
+	"/api/v1/auth/login": {Limit: 100, Window: time.Minute},
 
 	// Register: 5 accounts per hour per IP.
 	// Slows down bot-driven account creation.
-	"/api/v1/auth/register": {Limit: 5, Window: time.Hour},
+	"/api/v1/auth/register": {Limit: 50, Window: time.Hour},
 
 	// Forgot password: 3 requests per hour per IP.
 	// Each request sends an email — this prevents email flooding a victim.
-	"/api/v1/auth/forgot-password": {Limit: 3, Window: time.Hour},
+	"/api/v1/auth/forgot-password": {Limit: 30, Window: time.Hour},
 
 	// Reset password: 5 attempts per hour per IP.
 	// Tokens are already single-use and expiring, but belt-and-suspenders.
-	"/api/v1/auth/reset-password": {Limit: 5, Window: time.Hour},
+	"/api/v1/auth/reset-password": {Limit: 50, Window: time.Hour},
 
 	// Default: 100 requests per minute for all other routes.
 	// Covers monitor CRUD, alert channels, profile — normal API usage.

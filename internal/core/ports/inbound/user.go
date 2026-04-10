@@ -13,7 +13,16 @@ type UserProfile struct {
 	Email     string    `json:"email"`
 	Username  string    `json:"username"`
 	Plan      string    `json:"plan"`
+	AvatarURL *string   `json:"avatar_url"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// AvatarUploadResult is returned by AvatarUploadURL.
+// upload_url: the browser PUTs the file here (goes straight to R2/S3).
+// public_url: the permanent URL to store after the upload succeeds.
+type AvatarUploadResult struct {
+	UploadURL string `json:"upload_url"`
+	PublicURL string `json:"public_url"`
 }
 
 type CreateAlertChannelInput struct {
@@ -41,6 +50,11 @@ func (i CreateAlertChannelInput) Validate() map[string]string {
 
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*UserProfile, error)
+	// AvatarUploadURL generates a short-lived presigned PUT URL for the browser
+	// to upload an avatar directly to object storage (S3/R2/MinIO).
+	AvatarUploadURL(ctx context.Context, userID uuid.UUID, contentType string) (*AvatarUploadResult, error)
+	// UpdateAvatar persists the public URL returned after a successful upload.
+	UpdateAvatar(ctx context.Context, userID uuid.UUID, publicURL string) error
 	CreateAlertChannel(ctx context.Context, input CreateAlertChannelInput) (*domain.AlertChannel, error)
 	ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
 	DeleteAlertChannel(ctx context.Context, channelID, userID uuid.UUID) error

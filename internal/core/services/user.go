@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ type userService struct {
 	alertSubs     outbound.AlertSubscriptionRepository
 	monitors      outbound.MonitorRepository
 	email         outbound.EmailSender
+	storage       outbound.StorageService // nil when storage is not configured
 }
 
 func NewUserService(
@@ -34,6 +36,7 @@ func NewUserService(
 	alertSubs outbound.AlertSubscriptionRepository,
 	monitors outbound.MonitorRepository,
 	email outbound.EmailSender,
+	storage outbound.StorageService,
 ) inbound.UserService {
 	return &userService{
 		users:         users,
@@ -42,6 +45,7 @@ func NewUserService(
 		alertSubs:     alertSubs,
 		monitors:      monitors,
 		email:         email,
+		storage:       storage,
 	}
 }
 
@@ -61,8 +65,55 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (*inboun
 		Email:     user.Email,
 		Username:  user.Username,
 		Plan:      plan.Name,
+		AvatarURL: user.AvatarURL,
 		CreatedAt: user.CreatedAt,
 	}, nil
+}
+
+var ErrStorageNotConfigured = errors.New("storage not configured")
+
+// allowedAvatarTypes maps accepted content-types to file extensions.
+// We validate here in the core so no adapter needs to duplicate this check.
+var allowedAvatarTypes = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/webp": "webp",
+}
+
+func (s *userService) AvatarUploadURL(ctx context.Context, userID uuid.UUID, contentType string) (*inbound.AvatarUploadResult, error) {
+	if s.storage == nil {
+		return nil, ErrStorageNotConfigured
+	}
+
+	ext, ok := allowedAvatarTypes[strings.ToLower(contentType)]
+	if !ok {
+		return nil, fmt.Errorf("unsupported image type: %s", contentType)
+	}
+
+	// Key format: avatars/<userID>.<ext>
+	// Using the userID as the filename means a new upload naturally overwrites
+	// the old one — no orphaned files accumulate in the bucket.
+	key := fmt.Sprintf("avatars/%s.%s", userID, ext)
+
+	uploadURL, err := s.storage.PresignPUT(ctx, key, 5*time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("presign: %w", err)
+	}
+
+	return &inbound.AvatarUploadResult{
+		UploadURL: uploadURL,
+		PublicURL: s.storage.PublicURL(key),
+	}, nil
+}
+
+func (s *userService) UpdateAvatar(ctx context.Context, userID uuid.UUID, publicURL string) error {
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	user.AvatarURL = &publicURL
+	user.UpdatedAt = time.Now()
+	return s.users.Update(ctx, user)
 }
 
 func (s *userService) CreateAlertChannel(ctx context.Context, input inbound.CreateAlertChannelInput) (*domain.AlertChannel, error) {

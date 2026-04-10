@@ -44,42 +44,47 @@ jobs:
           sudo mv migrate /usr/local/bin/migrate
 
       - name: Run migrations
-        # DATABASE_URL is stored in GitHub repo Settings → Secrets → Actions.
-        # It's the Neon connection string.
-        run: migrate -path ./migrations -database "$DATABASE_URL" up
+        # We use pgx5:// instead of postgres:// because the default pq driver
+        # doesn't support Neon's SCRAM-SHA-256 authentication. pgx5 does.
+        run: |
+          PGX_URL="${DATABASE_URL/postgres:\/\//pgx5://}"
+          PGX_URL="${PGX_URL/postgresql:\/\//pgx5://}"
+          migrate -path ./migrations -database "$PGX_URL" up
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   # ── Job 3: Deploy API ────────────────────────────────────────────────────────
   # Runs after migrations succeed.
   deploy-api:
-    name: Deploy API to Fly.io
+    name: Deploy API to Railway
     runs-on: ubuntu-latest
     needs: migrate
     steps:
       - uses: actions/checkout@v4
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
       - name: Deploy API
-        # --remote-only = Fly builds the Docker image on their infrastructure.
-        # We don't need Docker installed on the GitHub runner.
-        run: flyctl deploy --config fly.api.toml --remote-only
+        # RAILWAY_TOKEN and RAILWAY_SERVICE_API are stored in GitHub Secrets.
+        # --detach = don't wait for deployment to finish (faster CI).
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_API }} --detach
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # ── Job 4: Deploy Worker ─────────────────────────────────────────────────────
   # Also runs after migrations, in parallel with deploy-api.
   deploy-worker:
-    name: Deploy Worker to Fly.io
+    name: Deploy Worker to Railway
     runs-on: ubuntu-latest
     needs: migrate
     steps:
       - uses: actions/checkout@v4
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
       - name: Deploy Worker
-        run: flyctl deploy --config fly.worker.toml --remote-only
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_WORKER }} --detach
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

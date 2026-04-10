@@ -102,6 +102,54 @@ APP_ENV=dev go run ./cmd/worker   # colored logs in terminal, console alerts onl
 
 ---
 
+## Credentials
+
+> These are local/dev credentials only. Never use these in production.
+
+### Local Postgres (Docker)
+| Field    | Value  |
+|----------|--------|
+| Host     | localhost:5432 |
+| Database | upmon  |
+| Username | upmon  |
+| Password | upmon  |
+| Full URL | `postgres://upmon:upmon@localhost:5432/upmon?sslmode=disable` |
+
+### MinIO (local object storage for avatar uploads)
+| Field    | Value       |
+|----------|-------------|
+| API port | 9000        |
+| Console  | http://localhost:9001 |
+| Username | minioadmin  |
+| Password | minioadmin  |
+
+Start MinIO:
+```bash
+docker run -d --name minio \
+  -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  minio/minio server /data --console-address ":9001"
+```
+
+After starting: open http://localhost:9001 → login → create a bucket named `avatars` → set it to **public**.
+
+Add these to your `.env` for avatar uploads locally:
+```
+STORAGE_ENDPOINT=http://localhost:9000
+STORAGE_REGION=us-east-1
+STORAGE_ACCESS_KEY_ID=minioadmin
+STORAGE_SECRET_ACCESS_KEY=minioadmin
+STORAGE_BUCKET=avatars
+STORAGE_PUBLIC_BASE_URL=http://localhost:9000/avatars
+```
+
+### Neon (production database)
+Credentials are in your `.env` file (`DATABASE_URL`).
+If lost: Neon dashboard → your project → Connection Details.
+
+---
+
 ## Database
 
 ```bash

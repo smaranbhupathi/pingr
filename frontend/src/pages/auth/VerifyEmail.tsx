@@ -41,8 +41,13 @@ export function VerifyEmailPage() {
         {status === 'error' && (
           <>
             <div className="text-5xl mb-4">❌</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Invalid link</h2>
-            <p className="text-gray-500 text-sm">This verification link is invalid or has expired.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Verification failed</h2>
+            <p className="text-gray-500 text-sm mb-4">
+              This link may have already been used or something went wrong. Try registering again.
+            </p>
+            <Link to="/register" className="text-indigo-600 text-sm font-medium hover:underline">
+              Back to register
+            </Link>
           </>
         )}
       </div>

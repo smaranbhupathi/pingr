@@ -57,6 +57,8 @@ func NewRouter(
 
 		// Current user
 		r.Get("/me", userH.Me)
+		r.Post("/me/avatar-upload-url", userH.AvatarUploadURL)
+		r.Patch("/me/avatar", userH.UpdateAvatar)
 
 		// Alert channels
 		r.Route("/alert-channels", func(r chi.Router) {

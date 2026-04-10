@@ -16,6 +16,7 @@ type User struct {
 	ResetToken     string
 	ResetExpiresAt *time.Time
 	PlanID         uuid.UUID
+	AvatarURL      *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

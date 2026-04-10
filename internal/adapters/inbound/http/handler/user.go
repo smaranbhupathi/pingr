@@ -226,6 +226,87 @@ func (h *UserHandler) UnsubscribeMonitorFromChannel(w http.ResponseWriter, r *ht
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// AvatarUploadURL returns a short-lived presigned PUT URL so the browser can
+// upload an image directly to object storage without passing through the API.
+//
+// Request:  POST /api/v1/me/avatar-upload-url
+//
+//	body: { "content_type": "image/jpeg" }
+//
+// Response: { "upload_url": "...", "public_url": "..." }
+//
+// After the browser finishes the PUT, it calls PATCH /api/v1/me/avatar with
+// public_url so the API can save it to the database.
+func (h *UserHandler) AvatarUploadURL(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var body struct {
+		ContentType string `json:"content_type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ContentType == "" {
+		Error(w, http.StatusBadRequest, "content_type is required")
+		return
+	}
+
+	result, err := h.users.AvatarUploadURL(r.Context(), userID, body.ContentType)
+	if err != nil {
+		if errors.Is(err, services.ErrStorageNotConfigured) {
+			Error(w, http.StatusNotImplemented, "avatar uploads not configured")
+			return
+		}
+		h.log.ErrorContext(r.Context(), "avatar upload url failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"error", err,
+		)
+		Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	JSON(w, http.StatusOK, result)
+}
+
+// UpdateAvatar saves the public URL of an already-uploaded avatar to the database.
+//
+// Request:  PATCH /api/v1/me/avatar
+//
+//	body: { "avatar_url": "https://..." }
+func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var body struct {
+		AvatarURL string `json:"avatar_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AvatarURL == "" {
+		Error(w, http.StatusBadRequest, "avatar_url is required")
+		return
+	}
+
+	if err := h.users.UpdateAvatar(r.Context(), userID, body.AvatarURL); err != nil {
+		h.log.ErrorContext(r.Context(), "update avatar failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"error", err,
+		)
+		Error(w, http.StatusInternalServerError, "failed to update avatar")
+		return
+	}
+
+	h.log.InfoContext(r.Context(), "avatar updated",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+	)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *UserHandler) SubscribeMonitorToChannel(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -91,6 +92,15 @@ func (s *authService) Register(ctx context.Context, input inbound.RegisterInput)
 	}
 
 	if err := s.users.Create(ctx, user); err != nil {
+		// Postgres unique constraint violation (SQLSTATE 23505).
+		// This is a fallback for the rare race where two requests slip past
+		// the GetByEmail/GetByUsername checks above simultaneously.
+		if strings.Contains(err.Error(), "23505") {
+			if strings.Contains(err.Error(), "email") {
+				return ErrEmailTaken
+			}
+			return ErrUsernameTaken
+		}
 		return fmt.Errorf("create user: %w", err)
 	}
 

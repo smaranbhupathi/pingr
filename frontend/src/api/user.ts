@@ -5,7 +5,13 @@ export interface UserProfile {
   email: string
   username: string
   plan: string
+  avatar_url: string | null
   created_at: string
+}
+
+export interface AvatarUploadResult {
+  upload_url: string
+  public_url: string
 }
 
 export interface AlertChannel {
@@ -20,6 +26,12 @@ export interface AlertChannel {
 export const userApi = {
   me: () =>
     client.get<UserProfile>('/me'),
+
+  getAvatarUploadUrl: (contentType: string) =>
+    client.post<AvatarUploadResult>('/me/avatar-upload-url', { content_type: contentType }),
+
+  updateAvatar: (avatarUrl: string) =>
+    client.patch('/me/avatar', { avatar_url: avatarUrl }),
 
   listAlertChannels: () =>
     client.get<AlertChannel[]>('/alert-channels'),

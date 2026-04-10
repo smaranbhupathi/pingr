@@ -17,6 +17,7 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/ratelimit"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
+	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/storage"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
 	"github.com/smaranbhupathi/pingr/internal/logger"
@@ -58,6 +59,30 @@ func main() {
 		log.Info("RESEND_API_KEY not set — using console email sender (links printed to log)")
 	}
 
+	// Storage adapter — optional. When STORAGE_ENDPOINT is not set,
+	// avatar uploads return 501 Not Implemented instead of panicking.
+	// To use MinIO locally: set STORAGE_ENDPOINT=http://localhost:9000
+	// To use Cloudflare R2: set STORAGE_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+	var storageSvc outbound.StorageService
+	if storageEndpoint := os.Getenv("STORAGE_ENDPOINT"); storageEndpoint != "" {
+		s, err := storage.NewS3Store(storage.Config{
+			Endpoint:        storageEndpoint,
+			Region:          envOr("STORAGE_REGION", "auto"),
+			AccessKeyID:     mustEnv("STORAGE_ACCESS_KEY_ID"),
+			SecretAccessKey: mustEnv("STORAGE_SECRET_ACCESS_KEY"),
+			Bucket:          mustEnv("STORAGE_BUCKET"),
+			PublicBaseURL:   mustEnv("STORAGE_PUBLIC_BASE_URL"),
+		})
+		if err != nil {
+			log.Error("init storage failed", "error", err)
+			os.Exit(1)
+		}
+		storageSvc = s
+		log.Info("storage initialised", "endpoint", storageEndpoint, "bucket", mustEnv("STORAGE_BUCKET"))
+	} else {
+		log.Info("STORAGE_ENDPOINT not set — avatar uploads disabled")
+	}
+
 	// Core services
 	authSvc := services.NewAuthService(userRepo, planRepo, alertChannelRepo, emailSender, services.AuthServiceConfig{
 		JWTSecret:            mustEnv("JWT_SECRET"),
@@ -66,7 +91,7 @@ func main() {
 		AppBaseURL:           mustEnv("APP_BASE_URL"),
 	})
 	monitorSvc := services.NewMonitorService(monitorRepo, checkRepo, incidentRepo, userRepo, planRepo)
-	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender)
+	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender, storageSvc)
 
 	// HTTP handlers
 	authH    := handler.NewAuthHandler(authSvc, log)

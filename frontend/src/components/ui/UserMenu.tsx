@@ -36,18 +36,31 @@ export function UserMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-semibold text-indigo-600 hover:bg-indigo-200 transition"
+        className="w-8 h-8 rounded-full overflow-hidden bg-indigo-100 flex items-center justify-center text-sm font-semibold text-indigo-600 hover:ring-2 hover:ring-indigo-400 transition"
         title={profile?.username}
       >
-        {initial}
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
       </button>
 
       {open && (
         <div className="absolute right-0 top-10 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
           {/* User info */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-gray-900">{profile?.username}</p>
-            <p className="text-xs text-gray-400 truncate">{profile?.email}</p>
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-indigo-100 flex items-center justify-center text-sm font-semibold text-indigo-600 shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile?.username} className="w-full h-full object-cover" />
+              ) : (
+                initial
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900">{profile?.username}</p>
+              <p className="text-xs text-gray-400 truncate">{profile?.email}</p>
+            </div>
           </div>
 
           {/* Profile */}
