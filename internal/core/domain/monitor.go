@@ -24,37 +24,37 @@ const (
 )
 
 type Monitor struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	Name             string
-	URL              string
-	Type             MonitorType
-	IntervalSeconds  int           // configurable per monitor, stored in DB
-	TimeoutSeconds   int           // how long before a check times out
-	FailureThreshold int           // consecutive failures before marking DOWN
-	Region           string        // "us-east", "eu-west" etc — region-tagged from day 1
-	IsActive         bool
-	Status           MonitorStatus
-	LastCheckedAt    *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID               uuid.UUID     `json:"id"`
+	UserID           uuid.UUID     `json:"user_id"`
+	Name             string        `json:"name"`
+	URL              string        `json:"url"`
+	Type             MonitorType   `json:"type"`
+	IntervalSeconds  int           `json:"interval_seconds"`
+	TimeoutSeconds   int           `json:"timeout_seconds"`
+	FailureThreshold int           `json:"failure_threshold"`
+	Region           string        `json:"region"`
+	IsActive         bool          `json:"is_active"`
+	Status           MonitorStatus `json:"status"`
+	LastCheckedAt    *time.Time    `json:"last_checked_at"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
 }
 
 type MonitorCheck struct {
-	ID             uuid.UUID
-	MonitorID      uuid.UUID
-	CheckedAt      time.Time
-	IsUp           bool
-	StatusCode     *int
-	ResponseTimeMs int64
-	ErrorMessage   string
-	Region         string
+	ID             uuid.UUID `json:"id"`
+	MonitorID      uuid.UUID `json:"monitor_id"`
+	CheckedAt      time.Time `json:"checked_at"`
+	IsUp           bool      `json:"is_up"`
+	StatusCode     *int      `json:"status_code"`
+	ResponseTimeMs int64     `json:"response_time_ms"`
+	ErrorMessage   string    `json:"error_message"`
+	Region         string    `json:"region"`
 }
 
 type Incident struct {
-	ID         uuid.UUID
-	MonitorID  uuid.UUID
-	StartedAt  time.Time
-	ResolvedAt *time.Time
-	Duration   *time.Duration // nil if ongoing
+	ID         uuid.UUID      `json:"id"`
+	MonitorID  uuid.UUID      `json:"monitor_id"`
+	StartedAt  time.Time      `json:"started_at"`
+	ResolvedAt *time.Time     `json:"resolved_at"`
+	Duration   *time.Duration `json:"-"`
 }

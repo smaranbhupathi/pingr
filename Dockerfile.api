@@ -1,0 +1,38 @@
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+# Start from the official Go image. This is big (~600MB) but only used to compile.
+FROM golang:1.24-alpine AS builder
+
+# Set the working directory inside the container.
+WORKDIR /app
+
+# Copy dependency manifests first.
+# Docker caches each layer. If go.mod/go.sum haven't changed, the next step
+# (downloading dependencies) is skipped on future builds — much faster.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Now copy the rest of the source code.
+COPY . .
+
+# Compile the API binary.
+# CGO_ENABLED=0 → static binary, no C dependencies needed at runtime.
+# -ldflags="-s -w" → strip debug symbols, shrinks binary size by ~30%.
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/api ./cmd/api
+
+# ── Stage 2: Run ──────────────────────────────────────────────────────────────
+# scratch is an empty image — literally nothing. Only our binary goes in.
+# Final image size: ~15MB instead of ~600MB.
+FROM scratch
+
+# Copy only the compiled binary from the builder stage.
+COPY --from=builder /bin/api /api
+
+# Copy TLS certificates so the binary can make HTTPS calls (e.g. to Resend).
+# scratch has no system certs, so we bring them from the builder.
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# The port our API listens on. This is documentation — Fly.io also reads it.
+EXPOSE 8080
+
+# The command to run when the container starts.
+ENTRYPOINT ["/api"]

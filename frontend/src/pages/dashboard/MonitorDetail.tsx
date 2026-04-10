@@ -1,15 +1,22 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { monitorsApi } from '../../api/monitors'
-import { Navbar } from '../../components/ui/Navbar'
+import { userApi } from '../../api/user'
+import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Card } from '../../components/ui/Card'
+import { Button } from '../../components/ui/Button'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Bell, CheckCircle, PauseCircle, PlayCircle, X } from 'lucide-react'
 import { format } from '../../lib/format'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 export function MonitorDetailPage() {
+  usePageTitle('Monitor detail')
   const { id } = useParams<{ id: string }>()
+
+  const queryClient = useQueryClient()
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ['monitors', id],
@@ -23,12 +30,16 @@ export function MonitorDetailPage() {
     refetchInterval: 60_000,
   })
 
+  const toggleMutation = useMutation({
+    mutationFn: () => monitorsApi.update(detail!.monitor.id, { is_active: !detail!.monitor.is_active }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitors', id] }),
+  })
+
   if (isLoading || !detail) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading…</div>
+      </DashboardLayout>
     )
   }
 
@@ -39,11 +50,11 @@ export function MonitorDetailPage() {
     ms: p.is_up ? p.response_time_ms : null,
   }))
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+  const effectiveStatus = monitor.is_active ? monitor.status : 'paused'
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+  return (
+    <DashboardLayout>
+      <div className="max-w-3xl mx-auto">
         <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6">
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
@@ -53,12 +64,29 @@ export function MonitorDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl font-semibold text-gray-900">{monitor.name}</h1>
-              <StatusBadge status={monitor.status} />
+              <StatusBadge status={effectiveStatus} />
             </div>
             <a href={monitor.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-500 hover:underline">
               {monitor.url} ↗
             </a>
+            {monitor.last_checked_at && (
+              <p className="text-xs text-gray-400 mt-1">
+                Last checked {format.timeAgo(monitor.last_checked_at)}
+              </p>
+            )}
           </div>
+          <button
+            onClick={() => toggleMutation.mutate()}
+            disabled={toggleMutation.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50
+              hover:bg-gray-50 border-gray-200 text-gray-600"
+            title={monitor.is_active ? 'Pause monitoring' : 'Resume monitoring'}
+          >
+            {monitor.is_active
+              ? <><PauseCircle size={15} className="text-amber-500" /> Pause</>
+              : <><PlayCircle size={15} className="text-green-500" /> Resume</>
+            }
+          </button>
         </div>
 
         {/* Uptime stats */}
@@ -105,7 +133,7 @@ export function MonitorDetailPage() {
         </Card>
 
         {/* Incidents */}
-        <Card className="p-6">
+        <Card className="p-6 mb-6">
           <h2 className="text-sm font-medium text-gray-700 mb-4">Incident history</h2>
           {incidents.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">No incidents — looking good! 🎉</p>
@@ -119,20 +147,121 @@ export function MonitorDetailPage() {
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       Started {format.datetime(i.started_at)}
-                      {i.resolved_at && ` · Resolved ${format.datetime(i.resolved_at)}`}
+                      {i.resolved_at
+                        ? ` · Resolved ${format.datetime(i.resolved_at)}`
+                        : ` · ${format.timeAgo(i.started_at)}`}
                     </p>
                   </div>
-                  {i.resolved_at && (
-                    <span className="text-xs text-gray-400">
-                      {format.duration(i.started_at, i.resolved_at)}
-                    </span>
-                  )}
+                  <span className="text-xs text-gray-400">
+                    {i.resolved_at
+                      ? format.duration(i.started_at, i.resolved_at)
+                      : `${format.ongoingDuration(i.started_at)} ongoing`}
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </Card>
-      </main>
-    </div>
+
+        {/* Alert subscriptions */}
+        <SubscribeSection monitorId={monitor.id} />
+      </div>
+    </DashboardLayout>
+  )
+}
+
+function SubscribeSection({ monitorId }: { monitorId: string }) {
+  const queryClient = useQueryClient()
+  const [selectedChannelId, setSelectedChannelId] = useState('')
+
+  const { data: allChannels = [] } = useQuery({
+    queryKey: ['alert-channels'],
+    queryFn: () => userApi.listAlertChannels().then(r => r.data ?? []),
+  })
+
+  const { data: subscribed = [] } = useQuery({
+    queryKey: ['monitor-subscriptions', monitorId],
+    queryFn: () => userApi.listMonitorSubscriptions(monitorId).then(r => r.data ?? []),
+  })
+
+  const subscribedIds = new Set(subscribed.map(ch => ch.id))
+  const available = allChannels.filter(ch => !subscribedIds.has(ch.id))
+
+  const subscribeMutation = useMutation({
+    mutationFn: () => userApi.subscribeMonitor(monitorId, selectedChannelId),
+    onSuccess: () => {
+      setSelectedChannelId('')
+      queryClient.invalidateQueries({ queryKey: ['monitor-subscriptions', monitorId] })
+    },
+  })
+
+  const unsubscribeMutation = useMutation({
+    mutationFn: (channelId: string) => userApi.unsubscribeMonitor(monitorId, channelId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitor-subscriptions', monitorId] }),
+  })
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Bell size={16} className="text-indigo-500" />
+        <h2 className="text-sm font-medium text-gray-700">Alert channels</h2>
+      </div>
+
+      {/* Subscribed channels */}
+      {subscribed.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {subscribed.map(ch => (
+            <div key={ch.id} className="flex items-center gap-2 text-sm text-gray-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+              <CheckCircle size={14} className="text-green-500 shrink-0" />
+              <span>{ch.config.email}</span>
+              <span className="text-xs text-gray-400 ml-auto mr-2">email · subscribed</span>
+              <button
+                onClick={() => unsubscribeMutation.mutate(ch.id)}
+                disabled={unsubscribeMutation.isPending}
+                className="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                title="Remove subscription"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add subscription */}
+      {allChannels.length === 0 ? (
+        <p className="text-sm text-gray-400">
+          No alert channels yet.{' '}
+          <Link to="/dashboard/alert-channels" className="text-indigo-500 hover:underline">Create one first.</Link>
+        </p>
+      ) : available.length === 0 ? (
+        <p className="text-sm text-gray-400">All your alert channels are already subscribed.</p>
+      ) : (
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-gray-500 block mb-1">Add channel</label>
+            <select
+              value={selectedChannelId}
+              onChange={e => setSelectedChannelId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Select a channel…</option>
+              {available.map(ch => (
+                <option key={ch.id} value={ch.id}>
+                  {ch.config.email} (email)
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            onClick={() => subscribeMutation.mutate()}
+            loading={subscribeMutation.isPending}
+            disabled={!selectedChannelId}
+          >
+            Subscribe
+          </Button>
+        </div>
+      )}
+    </Card>
   )
 }

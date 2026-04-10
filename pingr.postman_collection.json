@@ -1,0 +1,261 @@
+{
+  "info": {
+    "name": "Pingr API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080/api/v1" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"username\": \"testuser\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "var json = pm.response.json();\npm.collectionVariables.set('access_token', json.access_token);\npm.collectionVariables.set('refresh_token', json.refresh_token);"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "var json = pm.response.json();\npm.collectionVariables.set('access_token', json.access_token);\npm.collectionVariables.set('refresh_token', json.refresh_token);"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/verify-email?token=PASTE_TOKEN_HERE",
+              "query": [{ "key": "token", "value": "PASTE_TOKEN_HERE" }]
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/forgot-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/reset-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PASTE_RESET_TOKEN_HERE\",\n  \"new_password\": \"NewPassword123!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Monitors",
+      "item": [
+        {
+          "name": "List Monitors",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/monitors",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Create Monitor",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/monitors",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Website\",\n  \"url\": \"https://example.com\",\n  \"interval_seconds\": 60\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Monitor",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/monitors/MONITOR_ID_HERE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Update Monitor",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/monitors/MONITOR_ID_HERE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"interval_seconds\": 120,\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Monitor",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/monitors/MONITOR_ID_HERE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Get Response Time Graph",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/monitors/MONITOR_ID_HERE/graph",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alert Channels",
+      "item": [
+        {
+          "name": "List Alert Channels",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/alert-channels",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Create Alert Channel (Email)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/alert-channels",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"email\",\n  \"config\": {\n    \"email\": \"alerts@example.com\"\n  },\n  \"is_default\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Alert Channel",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/alert-channels/CHANNEL_ID_HERE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Subscribe Monitor to Channel",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/monitors/MONITOR_ID_HERE/subscribe",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alert_channel_id\": \"CHANNEL_ID_HERE\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Status Page",
+      "item": [
+        {
+          "name": "Get Status Page",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/status/testuser"
+          }
+        }
+      ]
+    }
+  ]
+}

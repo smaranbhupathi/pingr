@@ -45,4 +45,6 @@ type UserService interface {
 	ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
 	DeleteAlertChannel(ctx context.Context, channelID, userID uuid.UUID) error
 	SubscribeMonitorToChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
+	UnsubscribeMonitorFromChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
+	ListMonitorSubscriptions(ctx context.Context, monitorID, userID uuid.UUID) ([]domain.AlertChannel, error)
 }

@@ -2,13 +2,14 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { monitorsApi, type MonitorDetail } from '../../api/monitors'
 import { format } from '../../lib/format'
+import { Footer } from '../../components/ui/Footer'
 
 export function StatusPage() {
   const { username } = useParams<{ username: string }>()
 
   const { data: monitors = [], isLoading, isError } = useQuery({
     queryKey: ['status', username],
-    queryFn: () => monitorsApi.statusPage(username!).then(r => r.data),
+    queryFn: () => monitorsApi.statusPage(username!).then(r => r.data ?? []),
     refetchInterval: 60_000,
   })
 
@@ -85,8 +86,8 @@ function MonitorStatusRow({ detail }: { detail: MonitorDetail }) {
 
 function StatusShell({ username, children }: { username: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 max-w-2xl w-full mx-auto px-6 py-12">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">{username}</h1>
           <p className="text-sm text-gray-400 mt-1">Service Status</p>
@@ -97,6 +98,7 @@ function StatusShell({ username, children }: { username: string; children: React
           <Link to="/" className="text-indigo-400 hover:underline">Pingr</Link>
         </p>
       </div>
+      <Footer />
     </div>
   )
 }

@@ -1,0 +1,20 @@
+# Fly.io configuration for the Pingr Worker service.
+# Deploy with: fly deploy --config fly.worker.toml --app pingr-worker
+
+app = "pingr-worker"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile.worker"
+
+# No [http_service] block — the worker has no public-facing port.
+# It only makes outbound connections: PostgreSQL and HTTP to monitored URLs.
+# This means zero inbound attack surface.
+
+# Keep the worker always running. Never auto-stop.
+[deploy]
+  strategy = "immediate"  # Replace old instance immediately (no traffic to drain)
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

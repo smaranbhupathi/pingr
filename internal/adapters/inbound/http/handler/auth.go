@@ -3,18 +3,21 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
+	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/middleware"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/inbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
 )
 
 type AuthHandler struct {
 	auth inbound.AuthService
+	log  *slog.Logger
 }
 
-func NewAuthHandler(auth inbound.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+func NewAuthHandler(auth inbound.AuthService, log *slog.Logger) *AuthHandler {
+	return &AuthHandler{auth: auth, log: log}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -36,11 +39,21 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrUsernameTaken):
 			Error(w, http.StatusConflict, "username already taken")
 		default:
+			h.log.ErrorContext(r.Context(), "register failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"email", input.Email,
+				"error", err,
+			)
 			Error(w, http.StatusInternalServerError, "registration failed")
 		}
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "user registered",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"email", input.Email,
+		"username", input.Username,
+	)
 	JSON(w, http.StatusCreated, map[string]string{"message": "check your email to verify your account"})
 }
 
@@ -64,11 +77,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrNotVerified):
 			Error(w, http.StatusForbidden, "please verify your email first")
 		default:
+			h.log.ErrorContext(r.Context(), "login failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"email", input.Email,
+				"error", err,
+			)
 			Error(w, http.StatusInternalServerError, "login failed")
 		}
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "user logged in",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"email", input.Email,
+	)
 	JSON(w, http.StatusOK, tokens)
 }
 
@@ -83,10 +105,16 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.auth.RefreshTokens(r.Context(), body.RefreshToken)
 	if err != nil {
+		h.log.WarnContext(r.Context(), "token refresh rejected — invalid or expired",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+		)
 		Error(w, http.StatusUnauthorized, "invalid or expired refresh token")
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "tokens refreshed",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+	)
 	JSON(w, http.StatusOK, tokens)
 }
 
@@ -102,6 +130,9 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "email verified",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+	)
 	JSON(w, http.StatusOK, map[string]string{"message": "email verified successfully"})
 }
 
@@ -114,8 +145,11 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Always return 200 to avoid email enumeration
 	h.auth.ForgotPassword(r.Context(), body.Email)
+	// Log without the email — we intentionally don't reveal whether the address exists
+	h.log.InfoContext(r.Context(), "forgot password requested",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+	)
 	JSON(w, http.StatusOK, map[string]string{"message": "if that email exists, a reset link has been sent"})
 }
 
@@ -130,9 +164,15 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.auth.ResetPassword(r.Context(), body.Token, body.NewPassword); err != nil {
+		h.log.WarnContext(r.Context(), "password reset failed — invalid or expired token",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+		)
 		Error(w, http.StatusBadRequest, "invalid or expired token")
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "password reset successful",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+	)
 	JSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
 }

@@ -3,8 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Footer } from '../../components/ui/Footer'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 export function RegisterPage() {
+  usePageTitle('Create account')
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', username: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -49,7 +52,8 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="text-2xl font-bold text-indigo-600">Pingr</Link>
@@ -103,6 +107,8 @@ export function RegisterPage() {
           </Link>
         </p>
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -15,13 +16,15 @@ func NewRouter(
 	monitorH *handler.MonitorHandler,
 	userH *handler.UserHandler,
 	jwtSecret string,
+	allowedOrigin string,
+	log *slog.Logger,
 ) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(chimiddleware.Logger)
-	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.RealIP)
-	r.Use(corsMiddleware)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(middleware.RequestLogger(log))
+	r.Use(corsMiddleware(allowedOrigin))
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -64,22 +67,30 @@ func NewRouter(
 			r.Patch("/{id}", monitorH.Update)
 			r.Delete("/{id}", monitorH.Delete)
 			r.Get("/{id}/graph", monitorH.ResponseTimeGraph)
+			r.Get("/{id}/subscriptions", userH.ListMonitorSubscriptions)
 			r.Post("/{id}/subscribe", userH.SubscribeMonitorToChannel)
+			r.Delete("/{id}/subscriptions/{channelId}", userH.UnsubscribeMonitorFromChannel)
 		})
 	})
 
 	return r
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// corsMiddleware returns a middleware that sets CORS headers.
+// allowedOrigin should be "*" in dev and your exact frontend URL in prod
+// (e.g. "https://pingr.yourdomain.com"). Locking to a specific origin in prod
+// prevents other websites from making authenticated requests on behalf of your users.
+func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

@@ -18,9 +18,10 @@ type Notifier interface {
 	Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error
 }
 
-// EmailSender is used for transactional emails (verify, reset password).
+// EmailSender is used for transactional emails (verify, reset password, subscription confirmation).
 // Separate from Notifier because these are system emails, not user-configured alerts.
 type EmailSender interface {
 	SendVerification(ctx context.Context, toEmail, token string) error
 	SendPasswordReset(ctx context.Context, toEmail, token string) error
+	SendSubscriptionConfirmation(ctx context.Context, toEmail, monitorName, monitorURL string) error
 }

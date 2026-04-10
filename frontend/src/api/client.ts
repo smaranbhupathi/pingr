@@ -1,7 +1,13 @@
 import axios from 'axios'
 
+// In dev: VITE_API_URL=http://localhost:8080 (set in .env)
+// In prod: VITE_API_URL=https://api.yourdomain.com (set in Cloudflare Pages env vars)
+// Vite replaces import.meta.env.VITE_* values at build time — they become
+// hardcoded strings in the final JS bundle, not runtime lookups.
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
+
 export const client = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${BASE_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -26,7 +32,7 @@ client.interceptors.response.use(
         return Promise.reject(err)
       }
       try {
-        const { data } = await axios.post('/api/v1/auth/refresh', {
+        const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh`, {
           refresh_token: refreshToken,
         })
         localStorage.setItem('access_token', data.access_token)

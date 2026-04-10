@@ -1,8 +1,12 @@
 # Binaries
 bin/
 
-# Environment
+# Environment — never commit real secrets
 .env
+.env.*
+!.env.example    # but DO commit the example template
+frontend/.env
+frontend/.env.*
 
 # Go
 *.test
@@ -10,3 +14,11 @@ bin/
 
 # OS
 .DS_Store
+
+# Scratch files that shouldn't be in the repo
+*.pgsql
+*.sql.bak
+
+# Compiled binaries sitting in root (from go build without -o)
+/api
+/worker

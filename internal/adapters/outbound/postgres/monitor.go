@@ -32,11 +32,11 @@ func (r *monitorRepo) Create(ctx context.Context, m *domain.Monitor) error {
 }
 
 func (r *monitorRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Monitor, error) {
-	return r.scanOne(r.db.QueryRow(ctx, `SELECT `+monitorCols+` FROM monitors WHERE id=$1`, id))
+	return r.scanOne(r.db.QueryRow(ctx, `SELECT `+monitorCols+` FROM monitors WHERE id=$1 AND deleted_at IS NULL`, id))
 }
 
 func (r *monitorRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Monitor, error) {
-	rows, err := r.db.Query(ctx, `SELECT `+monitorCols+` FROM monitors WHERE user_id=$1 ORDER BY created_at DESC`, userID)
+	rows, err := r.db.Query(ctx, `SELECT `+monitorCols+` FROM monitors WHERE user_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,9 +45,11 @@ func (r *monitorRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]doma
 
 func (r *monitorRepo) GetByUsername(ctx context.Context, username string) ([]domain.Monitor, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT `+monitorCols+` FROM monitors m
+		SELECT m.id, m.user_id, m.name, m.url, m.type, m.interval_seconds, m.timeout_seconds,
+			m.failure_threshold, m.region, m.is_active, m.status, m.last_checked_at, m.created_at, m.updated_at
+		FROM monitors m
 		JOIN users u ON u.id = m.user_id
-		WHERE u.username=$1 AND m.is_active=true
+		WHERE u.username=$1 AND m.is_active=true AND m.deleted_at IS NULL
 		ORDER BY m.created_at DESC`, username,
 	)
 	if err != nil {
@@ -62,6 +64,7 @@ func (r *monitorRepo) GetDue(ctx context.Context, region string) ([]domain.Monit
 	rows, err := r.db.Query(ctx, `
 		SELECT `+monitorCols+` FROM monitors
 		WHERE is_active = true
+		  AND deleted_at IS NULL
 		  AND region = $1
 		  AND (
 		    last_checked_at IS NULL
@@ -90,13 +93,13 @@ func (r *monitorRepo) Update(ctx context.Context, m *domain.Monitor) error {
 }
 
 func (r *monitorRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM monitors WHERE id=$1`, id)
+	_, err := r.db.Exec(ctx, `UPDATE monitors SET deleted_at = NOW() WHERE id=$1 AND deleted_at IS NULL`, id)
 	return err
 }
 
 func (r *monitorRepo) CountByUserID(ctx context.Context, userID uuid.UUID) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM monitors WHERE user_id=$1`, userID).Scan(&count)
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM monitors WHERE user_id=$1 AND deleted_at IS NULL`, userID).Scan(&count)
 	return count, err
 }
 
@@ -117,7 +120,7 @@ func (r *monitorRepo) scanOne(row pgx.Row) (*domain.Monitor, error) {
 
 func (r *monitorRepo) scanMany(rows pgx.Rows) ([]domain.Monitor, error) {
 	defer rows.Close()
-	var monitors []domain.Monitor
+	monitors := make([]domain.Monitor, 0)
 	for rows.Next() {
 		m, err := r.scanOne(rows)
 		if err != nil {
@@ -157,7 +160,7 @@ func (r *checkRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID, fro
 	}
 	defer rows.Close()
 
-	var checks []domain.MonitorCheck
+	checks := make([]domain.MonitorCheck, 0)
 	for rows.Next() {
 		var c domain.MonitorCheck
 		if err := rows.Scan(&c.ID, &c.MonitorID, &c.CheckedAt, &c.IsUp, &c.StatusCode, &c.ResponseTimeMs, &c.ErrorMessage, &c.Region); err != nil {
@@ -231,7 +234,7 @@ func (r *incidentRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID) 
 	}
 	defer rows.Close()
 
-	var incidents []domain.Incident
+	incidents := make([]domain.Incident, 0)
 	for rows.Next() {
 		var i domain.Incident
 		if err := rows.Scan(&i.ID, &i.MonitorID, &i.StartedAt, &i.ResolvedAt); err != nil {

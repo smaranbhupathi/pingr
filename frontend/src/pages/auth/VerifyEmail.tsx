@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { authApi } from '../../api/auth'
+import { Footer } from '../../components/ui/Footer'
 
 export function VerifyEmailPage() {
   const [params] = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const called = useRef(false)
 
   useEffect(() => {
+    if (called.current) return
+    called.current = true
     const token = params.get('token')
     if (!token) { setStatus('error'); return }
     authApi.verifyEmail(token)
@@ -15,7 +19,8 @@ export function VerifyEmailPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         {status === 'loading' && (
           <>
@@ -41,6 +46,8 @@ export function VerifyEmailPage() {
           </>
         )}
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

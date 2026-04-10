@@ -16,29 +16,29 @@ type CreateMonitorInput struct {
 }
 
 type UpdateMonitorInput struct {
-	Name            *string
-	IntervalSeconds *int
-	IsActive        *bool
+	Name            *string `json:"name"`
+	IntervalSeconds *int    `json:"interval_seconds"`
+	IsActive        *bool   `json:"is_active"`
 }
 
 type UptimeStats struct {
-	Last24h float64
-	Last7d  float64
-	Last30d float64
-	Last90d float64
+	Last24h float64 `json:"last_24h"`
+	Last7d  float64 `json:"last_7d"`
+	Last30d float64 `json:"last_30d"`
+	Last90d float64 `json:"last_90d"`
 }
 
 type MonitorDetail struct {
-	Monitor     domain.Monitor
-	Uptime      UptimeStats
-	RecentCheck *domain.MonitorCheck
-	Incidents   []domain.Incident
+	Monitor     domain.Monitor       `json:"monitor"`
+	Uptime      UptimeStats          `json:"uptime"`
+	RecentCheck *domain.MonitorCheck `json:"recent_check"`
+	Incidents   []domain.Incident    `json:"incidents"`
 }
 
 type CheckDataPoint struct {
-	Timestamp      time.Time
-	ResponseTimeMs int64
-	IsUp           bool
+	Timestamp      time.Time `json:"timestamp"`
+	ResponseTimeMs int64     `json:"response_time_ms"`
+	IsUp           bool      `json:"is_up"`
 }
 
 type MonitorService interface {

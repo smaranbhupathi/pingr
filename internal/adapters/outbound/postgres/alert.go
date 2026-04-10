@@ -33,7 +33,7 @@ func (r *alertChannelRepo) Create(ctx context.Context, ch *domain.AlertChannel) 
 
 func (r *alertChannelRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, type, config, is_default, created_at FROM alert_channels WHERE user_id=$1`,
+		`SELECT id, user_id, type, config, is_default, created_at FROM alert_channels WHERE user_id=$1 AND deleted_at IS NULL`,
 		userID,
 	)
 	if err != nil {
@@ -48,7 +48,7 @@ func (r *alertChannelRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UU
 		SELECT ac.id, ac.user_id, ac.type, ac.config, ac.is_default, ac.created_at
 		FROM alert_channels ac
 		JOIN alert_subscriptions s ON s.alert_channel_id = ac.id
-		WHERE s.monitor_id = $1`, monitorID,
+		WHERE s.monitor_id = $1 AND ac.deleted_at IS NULL`, monitorID,
 	)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (r *alertChannelRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UU
 }
 
 func (r *alertChannelRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM alert_channels WHERE id=$1`, id)
+	_, err := r.db.Exec(ctx, `UPDATE alert_channels SET deleted_at = NOW() WHERE id=$1 AND deleted_at IS NULL`, id)
 	return err
 }
 
@@ -67,7 +67,7 @@ func scanAlertChannels(rows interface {
 	Scan(...any) error
 	Err() error
 }) ([]domain.AlertChannel, error) {
-	var channels []domain.AlertChannel
+	channels := make([]domain.AlertChannel, 0)
 	for rows.Next() {
 		var ch domain.AlertChannel
 		var configJSON []byte

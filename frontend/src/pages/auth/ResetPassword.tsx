@@ -3,8 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Footer } from '../../components/ui/Footer'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 export function ResetPasswordPage() {
+  usePageTitle('Reset password')
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const token = params.get('token') ?? ''
@@ -31,7 +34,8 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="text-2xl font-bold text-indigo-600">Pingr</Link>
@@ -58,6 +62,8 @@ export function ResetPasswordPage() {
           </form>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

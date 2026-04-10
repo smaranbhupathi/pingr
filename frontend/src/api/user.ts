@@ -32,4 +32,10 @@ export const userApi = {
 
   subscribeMonitor: (monitorId: string, alertChannelId: string) =>
     client.post(`/monitors/${monitorId}/subscribe`, { alert_channel_id: alertChannelId }),
+
+  unsubscribeMonitor: (monitorId: string, channelId: string) =>
+    client.delete(`/monitors/${monitorId}/subscriptions/${channelId}`),
+
+  listMonitorSubscriptions: (monitorId: string) =>
+    client.get<AlertChannel[]>(`/monitors/${monitorId}/subscriptions`),
 }

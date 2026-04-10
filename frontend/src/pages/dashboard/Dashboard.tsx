@@ -2,21 +2,31 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { monitorsApi, type Monitor } from '../../api/monitors'
-import { Navbar } from '../../components/ui/Navbar'
+import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Button } from '../../components/ui/Button'
-import { Card } from '../../components/ui/Card'
 import { AddMonitorModal } from './AddMonitorModal'
 import { Globe, Trash2, PauseCircle, PlayCircle } from 'lucide-react'
+import { usePageTitle } from '../../lib/usePageTitle'
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
 
 export function DashboardPage() {
+  usePageTitle('Monitors')
   const [showAdd, setShowAdd] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: monitors = [], isLoading } = useQuery({
     queryKey: ['monitors'],
-    queryFn: () => monitorsApi.list().then(r => r.data),
-    refetchInterval: 30_000, // refresh every 30s
+    queryFn: () => monitorsApi.list().then(r => r.data ?? []),
+    refetchInterval: 30_000,
   })
 
   const deleteMutation = useMutation({
@@ -34,44 +44,43 @@ export function DashboardPage() {
   const down = monitors.filter(m => m.status === 'down').length
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Total monitors</p>
-            <p className="text-3xl font-semibold text-gray-900 mt-1">{monitors.length}</p>
-          </Card>
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Up</p>
-            <p className="text-3xl font-semibold text-green-600 mt-1">{up}</p>
-          </Card>
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Down</p>
-            <p className="text-3xl font-semibold text-red-600 mt-1">{down}</p>
-          </Card>
+    <DashboardLayout>
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Monitors</h1>
+          {monitors.length > 0 && (
+            <p className="text-sm text-gray-400 mt-0.5">
+              {up} up · {down} down · {monitors.length} total
+            </p>
+          )}
         </div>
+        <Button onClick={() => setShowAdd(true)}>+ Add monitor</Button>
+      </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Monitors</h2>
-          <Button onClick={() => setShowAdd(true)}>+ Add monitor</Button>
+      {/* Table */}
+      {isLoading ? (
+        <div className="text-center py-20 text-gray-400 text-sm">Loading…</div>
+      ) : monitors.length === 0 ? (
+        <div className="text-center py-24 border border-dashed border-gray-200 rounded-xl">
+          <Globe className="mx-auto mb-3 text-gray-300" size={36} />
+          <p className="text-sm font-medium text-gray-500">No monitors yet</p>
+          <p className="text-xs text-gray-400 mt-1 mb-4">Add a URL to start tracking uptime</p>
+          <Button onClick={() => setShowAdd(true)}>Add monitor</Button>
         </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Monitor</span>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</span>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Interval</span>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Last checked</span>
+            <span />
+          </div>
 
-        {/* Monitor list */}
-        {isLoading ? (
-          <Card className="p-12 text-center text-gray-400">Loading...</Card>
-        ) : monitors.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Globe className="mx-auto mb-3 text-gray-300" size={40} />
-            <p className="text-gray-500 font-medium">No monitors yet</p>
-            <p className="text-gray-400 text-sm mt-1">Add your first URL to start monitoring</p>
-            <Button className="mt-4" onClick={() => setShowAdd(true)}>Add monitor</Button>
-          </Card>
-        ) : (
-          <div className="space-y-3">
+          {/* Rows */}
+          <div className="divide-y divide-gray-100">
             {monitors.map(m => (
               <MonitorRow
                 key={m.id}
@@ -81,16 +90,16 @@ export function DashboardPage() {
               />
             ))}
           </div>
-        )}
-      </main>
+        </div>
+      )}
 
       {showAdd && <AddMonitorModal onClose={() => setShowAdd(false)} />}
-    </div>
+    </DashboardLayout>
   )
 }
 
 function MonitorRow({
-  monitor,
+  monitor: m,
   onDelete,
   onToggle,
 }: {
@@ -99,33 +108,43 @@ function MonitorRow({
   onToggle: () => void
 }) {
   return (
-    <Card className="p-4 flex items-center justify-between hover:shadow-md transition-shadow">
-      <Link to={`/dashboard/monitors/${monitor.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-        <StatusBadge status={monitor.status} />
-        <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{monitor.name}</p>
-          <p className="text-sm text-gray-400 truncate">{monitor.url}</p>
-        </div>
+    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group">
+      {/* Name + URL */}
+      <Link to={`/dashboard/monitors/${m.id}`} className="min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
+        <p className="text-xs text-gray-400 truncate mt-0.5">{m.url}</p>
       </Link>
-      <div className="flex items-center gap-2 ml-4 shrink-0">
-        <span className="text-xs text-gray-400">
-          Every {monitor.interval_seconds / 60}m
-        </span>
+
+      {/* Status */}
+      <div>
+        <StatusBadge status={m.is_active ? m.status : 'paused'} />
+      </div>
+
+      {/* Interval */}
+      <span className="text-sm text-gray-500">
+        {m.interval_seconds < 60 ? `${m.interval_seconds}s` : `${m.interval_seconds / 60}m`}
+      </span>
+
+      {/* Last checked */}
+      <span className="text-sm text-gray-400">{timeAgo(m.last_checked_at)}</span>
+
+      {/* Actions — visible on hover */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={onToggle}
           className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
-          title={monitor.is_active ? 'Pause' : 'Resume'}
+          title={m.is_active ? 'Pause' : 'Resume'}
         >
-          {monitor.is_active ? <PauseCircle size={16} /> : <PlayCircle size={16} />}
+          {m.is_active ? <PauseCircle size={15} /> : <PlayCircle size={15} />}
         </button>
         <button
           onClick={onDelete}
           className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
           title="Delete"
         >
-          <Trash2 size={16} />
+          <Trash2 size={15} />
         </button>
       </div>
-    </Card>
+    </div>
   )
 }

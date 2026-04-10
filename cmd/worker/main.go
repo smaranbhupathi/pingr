@@ -2,52 +2,59 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/checker"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
+	"github.com/smaranbhupathi/pingr/internal/logger"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("no .env file, using environment variables")
+		slog.Warn("no .env file, falling back to environment variables")
 	}
 
-	db, err := pgxpool.New(context.Background(), mustEnv("DATABASE_URL"))
+	env := envOr("APP_ENV", "dev")
+	log := logger.New(env)
+
+	log.Info("starting worker", "env", env)
+
+	db, err := postgres.Connect(context.Background(), mustEnv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		log.Error("connect db failed", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
-
-	if err := db.Ping(context.Background()); err != nil {
-		log.Fatalf("ping db: %v", err)
-	}
-	log.Println("database connected")
+	log.Info("database connected")
 
 	region := envOr("WORKER_REGION", "us-east")
 
-	// Wire repositories
-	monitorRepo := postgres.NewMonitorRepository(db)
-	checkRepo := postgres.NewCheckRepository(db)
-	incidentRepo := postgres.NewIncidentRepository(db)
+	// Repositories
+	monitorRepo      := postgres.NewMonitorRepository(db)
+	checkRepo        := postgres.NewCheckRepository(db)
+	incidentRepo     := postgres.NewIncidentRepository(db)
 	alertChannelRepo := postgres.NewAlertChannelRepository(db)
 
-	// Checkers — add TCPChecker, DNSChecker here in Roll-out 2, zero other changes
+	// Checkers — add TCPChecker, DNSChecker here in Roll-out 2
 	checkers := []outbound.Checker{
 		checker.NewHTTPChecker(),
 	}
 
-	// Notifiers — add SlackNotifier, DiscordNotifier here in Roll-out 2, zero other changes
-	notifiers := []outbound.Notifier{
-		email.NewNotifier(mustEnv("RESEND_API_KEY"), mustEnv("FROM_EMAIL")),
+	// Notifiers — use Resend if key is present, otherwise log to console
+	var notifiers []outbound.Notifier
+	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
+		notifiers = []outbound.Notifier{email.NewNotifier(resendKey, mustEnv("FROM_EMAIL"))}
+		log.Info("using Resend notifier", "from", mustEnv("FROM_EMAIL"))
+	} else {
+		notifiers = []outbound.Notifier{email.NewConsoleNotifier()}
+		log.Info("RESEND_API_KEY not set — using console notifier (alerts printed to log)")
 	}
 
 	w := checker.NewWorker(
@@ -58,7 +65,7 @@ func main() {
 		alertChannelRepo,
 		checkers,
 		notifiers,
-		20, // max concurrent checks — tune based on server capacity
+		20,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -68,18 +75,19 @@ func main() {
 
 	go func() {
 		<-quit
-		log.Println("shutting down worker...")
+		log.Info("shutting down worker...")
 		cancel()
 	}()
 
-	w.Run(ctx) // blocks until ctx cancelled
-	log.Println("worker stopped")
+	w.Run(ctx)
+	log.Info("worker stopped")
 }
 
 func mustEnv(key string) string {
 	val := os.Getenv(key)
 	if val == "" {
-		log.Fatalf("required env var %s is not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return val
 }

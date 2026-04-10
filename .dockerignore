@@ -1,0 +1,23 @@
+# Never send these to the Docker build context
+
+# Frontend build artifacts and dependencies — not needed for Go builds
+frontend/node_modules
+frontend/dist
+frontend/.env*
+
+# Secrets — should NEVER be baked into an image
+.env
+.env.*
+
+# Dev artifacts
+bin/
+/tmp/
+*.pid
+
+# Git history — not needed at runtime
+.git
+.gitignore
+
+# Editor noise
+.DS_Store
+*.swp

@@ -1,13 +1,151 @@
 import { Link } from 'react-router-dom'
-import { Activity, Bell, Globe, BarChart2 } from 'lucide-react'
+import { Activity, Bell, Globe, BarChart2, ArrowRight, Plus, ExternalLink } from 'lucide-react'
+import { isLoggedIn } from '../api/client'
+import { Footer } from '../components/ui/Footer'
+import { UserMenu } from '../components/ui/UserMenu'
+import { useQuery } from '@tanstack/react-query'
+import { userApi } from '../api/user'
+import { monitorsApi } from '../api/monitors'
 
-export function LandingPage() {
+// ─── Logged-in home ──────────────────────────────────────────────────────────
+
+function LoggedInHome() {
+  const { data: profile } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => userApi.me().then(r => r.data),
+  })
+
+  const { data: monitors = [] } = useQuery({
+    queryKey: ['monitors'],
+    queryFn: () => monitorsApi.list().then(r => r.data),
+  })
+
+  const up = monitors.filter(m => m.status === 'up').length
+  const down = monitors.filter(m => m.status === 'down').length
+  const total = monitors.length
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Top bar */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <span className="text-xl font-bold text-indigo-600">Pingr</span>
+        <UserMenu />
+      </nav>
+
+      <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-12">
+        {/* Greeting */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back{profile?.username ? `, ${profile.username}` : ''}
+          </h1>
+          <p className="text-gray-500 mt-1">Here's a quick overview of your monitoring.</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-4 mb-10">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <p className="text-sm text-gray-500 mb-1">Total monitors</p>
+            <p className="text-4xl font-bold text-gray-900">{total}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <p className="text-sm text-gray-500 mb-1">Up</p>
+            <p className="text-4xl font-bold text-green-600">{up}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <p className="text-sm text-gray-500 mb-1">Down</p>
+            <p className="text-4xl font-bold text-red-500">{down}</p>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Quick actions</h2>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Link
+            to="/dashboard"
+            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center">
+                <Activity size={18} className="text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">View monitors</p>
+                <p className="text-xs text-gray-400">See all your monitors</p>
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
+          </Link>
+
+          <Link
+            to="/dashboard"
+            state={{ openAdd: true }}
+            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
+                <Plus size={18} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Add a monitor</p>
+                <p className="text-xs text-gray-400">Start monitoring a new URL</p>
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
+          </Link>
+
+          <Link
+            to="/dashboard/alert-channels"
+            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center">
+                <Bell size={18} className="text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Alert channels</p>
+                <p className="text-xs text-gray-400">Manage where you get notified</p>
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
+          </Link>
+
+          {profile && (
+            <a
+              href={`/status/${profile.username}`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-sky-50 rounded-lg flex items-center justify-center">
+                  <Globe size={18} className="text-sky-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Your status page</p>
+                  <p className="text-xs text-gray-400">pingr.app/status/{profile.username}</p>
+                </div>
+              </div>
+              <ExternalLink size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
+            </a>
+          )}
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  )
+}
+
+// ─── Guest / marketing page ───────────────────────────────────────────────────
+
+function GuestHome() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navbar */}
       <nav className="border-b border-gray-100 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
         <span className="text-xl font-bold text-indigo-600">Pingr</span>
         <div className="flex items-center gap-4">
+          <Link to="/docs" className="text-sm text-gray-600 hover:text-gray-900">Docs</Link>
           <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900">Sign in</Link>
           <Link to="/register" className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700">
             Get started free
@@ -92,7 +230,6 @@ export function LandingPage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-3">Simple, honest pricing</h2>
           <p className="text-gray-500 mb-10">Start free. Upgrade only when you need more.</p>
           <div className="grid md:grid-cols-2 gap-6 text-left">
-            {/* Free */}
             <div className="bg-white border border-gray-200 rounded-xl p-8">
               <p className="text-sm font-medium text-gray-500 mb-1">Free</p>
               <p className="text-4xl font-bold text-gray-900 mb-1">₹0</p>
@@ -109,7 +246,6 @@ export function LandingPage() {
               </Link>
             </div>
 
-            {/* Pro — coming soon */}
             <div className="bg-indigo-600 border border-indigo-600 rounded-xl p-8 text-white">
               <p className="text-sm font-medium text-indigo-200 mb-1">Pro</p>
               <p className="text-4xl font-bold mb-1">₹299</p>
@@ -143,10 +279,13 @@ export function LandingPage() {
         </Link>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-100 px-6 py-6 text-center text-xs text-gray-400">
-        © {new Date().getFullYear()} Pingr · Built with ❤️ in Go
-      </footer>
+      <Footer />
     </div>
   )
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+export function LandingPage() {
+  return isLoggedIn() ? <LoggedInHome /> : <GuestHome />
 }

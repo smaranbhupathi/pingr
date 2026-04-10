@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,10 +17,11 @@ import (
 
 type MonitorHandler struct {
 	monitors inbound.MonitorService
+	log      *slog.Logger
 }
 
-func NewMonitorHandler(monitors inbound.MonitorService) *MonitorHandler {
-	return &MonitorHandler{monitors: monitors}
+func NewMonitorHandler(monitors inbound.MonitorService, log *slog.Logger) *MonitorHandler {
+	return &MonitorHandler{monitors: monitors, log: log}
 }
 
 func (h *MonitorHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +42,7 @@ func (h *MonitorHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.IntervalSeconds == 0 {
-		body.IntervalSeconds = 60 // sensible default
+		body.IntervalSeconds = 60
 	}
 
 	createInput := inbound.CreateMonitorInput{
@@ -62,11 +64,23 @@ func (h *MonitorHandler) Create(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrInvalidInterval):
 			Error(w, http.StatusBadRequest, "check interval below plan minimum")
 		default:
+			h.log.ErrorContext(r.Context(), "create monitor failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"user_id", userID,
+				"url", body.URL,
+				"error", err,
+			)
 			Error(w, http.StatusInternalServerError, "failed to create monitor")
 		}
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "monitor created",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"monitor_id", monitor.ID,
+		"url", monitor.URL,
+	)
 	JSON(w, http.StatusCreated, monitor)
 }
 
@@ -79,6 +93,11 @@ func (h *MonitorHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	monitors, err := h.monitors.ListByUser(r.Context(), userID)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "list monitors failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to list monitors")
 		return
 	}
@@ -105,6 +124,12 @@ func (h *MonitorHandler) Get(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusNotFound, "monitor not found")
 			return
 		}
+		h.log.ErrorContext(r.Context(), "get monitor failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"monitor_id", id,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to get monitor")
 		return
 	}
@@ -139,11 +164,24 @@ func (h *MonitorHandler) Update(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrInvalidInterval):
 			Error(w, http.StatusBadRequest, "check interval below plan minimum")
 		default:
+			h.log.ErrorContext(r.Context(), "update monitor failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"user_id", userID,
+				"monitor_id", id,
+				"error", err,
+			)
 			Error(w, http.StatusInternalServerError, "failed to update monitor")
 		}
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "monitor updated",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"monitor_id", monitor.ID,
+		"is_active", monitor.IsActive,
+		"interval_seconds", monitor.IntervalSeconds,
+	)
 	JSON(w, http.StatusOK, monitor)
 }
 
@@ -165,10 +203,21 @@ func (h *MonitorHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			Error(w, http.StatusNotFound, "monitor not found")
 			return
 		}
+		h.log.ErrorContext(r.Context(), "delete monitor failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"monitor_id", id,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to delete monitor")
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "monitor deleted",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"monitor_id", id,
+	)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -184,6 +233,11 @@ func (h *MonitorHandler) ResponseTimeGraph(w http.ResponseWriter, r *http.Reques
 
 	points, err := h.monitors.GetResponseTimeGraph(r.Context(), id, from, to)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "get graph failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"monitor_id", id,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to get graph data")
 		return
 	}
@@ -191,12 +245,16 @@ func (h *MonitorHandler) ResponseTimeGraph(w http.ResponseWriter, r *http.Reques
 	JSON(w, http.StatusOK, points)
 }
 
-// StatusPage is public — no auth required.
 func (h *MonitorHandler) StatusPage(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 
 	details, err := h.monitors.GetStatusPage(r.Context(), username)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "status page failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"username", username,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to load status page")
 		return
 	}

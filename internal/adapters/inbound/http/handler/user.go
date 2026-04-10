@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,10 +17,11 @@ import (
 
 type UserHandler struct {
 	users inbound.UserService
+	log   *slog.Logger
 }
 
-func NewUserHandler(users inbound.UserService) *UserHandler {
-	return &UserHandler{users: users}
+func NewUserHandler(users inbound.UserService, log *slog.Logger) *UserHandler {
+	return &UserHandler{users: users, log: log}
 }
 
 func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +33,11 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := h.users.GetProfile(r.Context(), userID)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "get profile failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to get profile")
 		return
 	}
@@ -68,10 +75,22 @@ func (h *UserHandler) CreateAlertChannel(w http.ResponseWriter, r *http.Request)
 
 	ch, err := h.users.CreateAlertChannel(r.Context(), input)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "create alert channel failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"type", body.Type,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to create alert channel")
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "alert channel created",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"channel_id", ch.ID,
+		"type", ch.Type,
+	)
 	JSON(w, http.StatusCreated, ch)
 }
 
@@ -84,6 +103,11 @@ func (h *UserHandler) ListAlertChannels(w http.ResponseWriter, r *http.Request) 
 
 	channels, err := h.users.ListAlertChannels(r.Context(), userID)
 	if err != nil {
+		h.log.ErrorContext(r.Context(), "list alert channels failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to list alert channels")
 		return
 	}
@@ -109,10 +133,96 @@ func (h *UserHandler) DeleteAlertChannel(w http.ResponseWriter, r *http.Request)
 			Error(w, http.StatusNotFound, "alert channel not found")
 			return
 		}
+		h.log.ErrorContext(r.Context(), "delete alert channel failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"channel_id", channelID,
+			"error", err,
+		)
 		Error(w, http.StatusInternalServerError, "failed to delete alert channel")
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "alert channel deleted",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"channel_id", channelID,
+	)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *UserHandler) ListMonitorSubscriptions(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	monitorID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid monitor id")
+		return
+	}
+
+	channels, err := h.users.ListMonitorSubscriptions(r.Context(), monitorID, userID)
+	if err != nil {
+		h.log.ErrorContext(r.Context(), "list monitor subscriptions failed",
+			"request_id", middleware.RequestIDFromContext(r.Context()),
+			"user_id", userID,
+			"monitor_id", monitorID,
+			"error", err,
+		)
+		Error(w, http.StatusInternalServerError, "failed to list subscriptions")
+		return
+	}
+
+	JSON(w, http.StatusOK, channels)
+}
+
+func (h *UserHandler) UnsubscribeMonitorFromChannel(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	monitorID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid monitor id")
+		return
+	}
+
+	channelID, err := uuid.Parse(chi.URLParam(r, "channelId"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid channel id")
+		return
+	}
+
+	if err := h.users.UnsubscribeMonitorFromChannel(r.Context(), monitorID, channelID, userID); err != nil {
+		switch {
+		case errors.Is(err, services.ErrMonitorNotFound):
+			Error(w, http.StatusNotFound, "monitor not found")
+		case errors.Is(err, services.ErrAlertChannelNotFound):
+			Error(w, http.StatusNotFound, "alert channel not found")
+		default:
+			h.log.ErrorContext(r.Context(), "unsubscribe monitor failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"user_id", userID,
+				"monitor_id", monitorID,
+				"channel_id", channelID,
+				"error", err,
+			)
+			Error(w, http.StatusInternalServerError, "failed to unsubscribe")
+		}
+		return
+	}
+
+	h.log.InfoContext(r.Context(), "monitor unsubscribed from channel",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"monitor_id", monitorID,
+		"channel_id", channelID,
+	)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -144,10 +254,23 @@ func (h *UserHandler) SubscribeMonitorToChannel(w http.ResponseWriter, r *http.R
 		case errors.Is(err, services.ErrAlertChannelNotFound):
 			Error(w, http.StatusNotFound, "alert channel not found")
 		default:
+			h.log.ErrorContext(r.Context(), "subscribe monitor failed",
+				"request_id", middleware.RequestIDFromContext(r.Context()),
+				"user_id", userID,
+				"monitor_id", monitorID,
+				"channel_id", body.AlertChannelID,
+				"error", err,
+			)
 			Error(w, http.StatusInternalServerError, "failed to subscribe")
 		}
 		return
 	}
 
+	h.log.InfoContext(r.Context(), "monitor subscribed to channel",
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+		"user_id", userID,
+		"monitor_id", monitorID,
+		"channel_id", body.AlertChannelID,
+	)
 	JSON(w, http.StatusCreated, map[string]string{"message": "subscribed"})
 }

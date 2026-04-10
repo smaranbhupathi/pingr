@@ -19,12 +19,12 @@ const (
 // Adding Slack later = new row with type="slack" and slack config in Config.
 // Zero schema changes needed.
 type AlertChannel struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Type      AlertChannelType
-	Config    map[string]any // e.g. {"email": "user@example.com"} or {"webhook_url": "..."}
-	IsDefault bool
-	CreatedAt time.Time
+	ID        uuid.UUID        `json:"id"`
+	UserID    uuid.UUID        `json:"user_id"`
+	Type      AlertChannelType `json:"type"`
+	Config    map[string]any   `json:"config"`
+	IsDefault bool             `json:"is_default"`
+	CreatedAt time.Time        `json:"created_at"`
 }
 
 // AlertSubscription links a monitor to an alert channel.

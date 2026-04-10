@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,20 +16,28 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/handler"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
+	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
+	"github.com/smaranbhupathi/pingr/internal/logger"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("no .env file, using environment variables")
+		slog.Warn("no .env file, falling back to environment variables")
 	}
+
+	env := envOr("APP_ENV", "dev")
+	log := logger.New(env)
+
+	log.Info("starting API server", "env", env)
 
 	db, err := postgres.Connect(context.Background(), mustEnv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		log.Error("connect db failed", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
-	log.Println("database connected")
+	log.Info("database connected")
 
 	// Outbound adapters
 	userRepo         := postgres.NewUserRepository(db)
@@ -40,11 +48,14 @@ func main() {
 	alertChannelRepo := postgres.NewAlertChannelRepository(db)
 	alertSubRepo     := postgres.NewAlertSubscriptionRepository(db)
 
-	emailSender := email.NewEmailSender(
-		mustEnv("RESEND_API_KEY"),
-		mustEnv("FROM_EMAIL"),
-		mustEnv("APP_BASE_URL"),
-	)
+	var emailSender outbound.EmailSender
+	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
+		emailSender = email.NewEmailSender(resendKey, mustEnv("FROM_EMAIL"), mustEnv("APP_BASE_URL"))
+		log.Info("using Resend email sender", "from", mustEnv("FROM_EMAIL"))
+	} else {
+		emailSender = email.NewConsoleSender(mustEnv("APP_BASE_URL"))
+		log.Info("RESEND_API_KEY not set — using console email sender (links printed to log)")
+	}
 
 	// Core services
 	authSvc := services.NewAuthService(userRepo, planRepo, alertChannelRepo, emailSender, services.AuthServiceConfig{
@@ -54,14 +65,17 @@ func main() {
 		AppBaseURL:           mustEnv("APP_BASE_URL"),
 	})
 	monitorSvc := services.NewMonitorService(monitorRepo, checkRepo, incidentRepo, userRepo, planRepo)
-	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo)
+	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender)
 
 	// HTTP handlers
-	authH    := handler.NewAuthHandler(authSvc)
-	monitorH := handler.NewMonitorHandler(monitorSvc)
-	userH    := handler.NewUserHandler(userSvc)
+	authH    := handler.NewAuthHandler(authSvc, log)
+	monitorH := handler.NewMonitorHandler(monitorSvc, log)
+	userH    := handler.NewUserHandler(userSvc, log)
 
-	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"))
+	// ALLOWED_ORIGIN controls CORS. Use "*" in dev (set in .env).
+	// In prod set it to your exact frontend URL: "https://pingr.yourdomain.com"
+	allowedOrigin := envOr("ALLOWED_ORIGIN", "*")
+	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"), allowedOrigin, log)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{
@@ -76,28 +90,31 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("API server listening on :%s", port)
+		log.Info("API server listening", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
+			log.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-quit
-	log.Println("shutting down API server...")
+	log.Info("shutting down API server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("forced shutdown: %v", err)
+		log.Error("forced shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("API server stopped")
+	log.Info("API server stopped")
 }
 
 func mustEnv(key string) string {
 	val := os.Getenv(key)
 	if val == "" {
-		log.Fatalf("required env var %s is not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return val
 }

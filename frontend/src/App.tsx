@@ -10,7 +10,10 @@ import { ResetPasswordPage } from './pages/auth/ResetPassword'
 import { VerifyEmailPage } from './pages/auth/VerifyEmail'
 import { DashboardPage } from './pages/dashboard/Dashboard'
 import { MonitorDetailPage } from './pages/dashboard/MonitorDetail'
+import { AlertChannelsPage } from './pages/dashboard/AlertChannels'
+import { ProfilePage } from './pages/dashboard/Profile'
 import { StatusPage } from './pages/status/StatusPage'
+import { DocsPage } from './pages/Docs'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +36,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/docs" element={<DocsPage />} />
           <Route path="/status/:username" element={<StatusPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
 
@@ -45,6 +49,8 @@ export default function App() {
           {/* Protected */}
           <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
           <Route path="/dashboard/monitors/:id" element={<RequireAuth><MonitorDetailPage /></RequireAuth>} />
+          <Route path="/dashboard/alert-channels" element={<RequireAuth><AlertChannelsPage /></RequireAuth>} />
+          <Route path="/dashboard/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

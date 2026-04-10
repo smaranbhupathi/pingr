@@ -1,0 +1,35 @@
+# Fly.io configuration for the Pingr API service.
+# Deploy with: fly deploy --config fly.api.toml --app pingr-api
+
+app = "pingr-api"       # Must match the app name you create on Fly.io
+primary_region = "sin"  # Singapore — closest to India. Change to "bom" if available.
+
+# Use our custom Dockerfile, not Fly's auto-detect.
+[build]
+  dockerfile = "Dockerfile.api"
+
+# HTTP service config — Fly handles TLS, routing, and load balancing.
+# Note: migrations are run in the GitHub Actions workflow (migrate job)
+# before this deploy step runs — same safety guarantee without needing
+# the migrate binary inside the container.
+[http_service]
+  internal_port = 8080        # Port our Go app listens on inside the container
+  force_https = true          # Redirect all HTTP → HTTPS automatically
+  auto_stop_machines = false  # Keep running even with zero traffic (worker pattern)
+  auto_start_machines = true
+  min_machines_running = 1    # Always keep at least 1 instance alive
+
+  # Health check — Fly hits this every 15s to confirm the app is healthy.
+  # If it fails 3 times in a row, the instance is replaced.
+  [[http_service.checks]]
+    grace_period = "10s"   # Wait 10s after start before checking (let app boot)
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+# Machine size — shared-cpu-1x with 256MB is the free tier.
+# Upgrade to shared-cpu-2x / 512MB when you start seeing latency.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
