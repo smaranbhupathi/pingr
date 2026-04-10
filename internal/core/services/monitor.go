@@ -19,7 +19,7 @@ var (
 	ErrInvalidInterval   = errors.New("check interval below plan minimum")
 )
 
-const defaultRegion = "us-east" // Roll-out 2: make this configurable per worker
+const defaultRegion = "sin" // Singapore — matches Railway worker region
 
 type monitorService struct {
 	monitors  outbound.MonitorRepository
