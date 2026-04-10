@@ -12,13 +12,9 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/worker ./cmd/worker
 
 # ── Stage 2: Run ──────────────────────────────────────────────────────────────
-FROM scratch
+FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /bin/worker /worker
-
-# Worker makes outbound HTTPS calls (to monitored URLs + Resend).
-# Needs CA certs just like the API.
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # No EXPOSE — the worker has no inbound port.
 # It only makes outbound connections: DB reads/writes and HTTP checks.

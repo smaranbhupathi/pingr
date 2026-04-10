@@ -20,19 +20,16 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/api ./cmd/api
 
 # ── Stage 2: Run ──────────────────────────────────────────────────────────────
-# scratch is an empty image — literally nothing. Only our binary goes in.
-# Final image size: ~15MB instead of ~600MB.
-FROM scratch
+# distroless/static is minimal like scratch but includes:
+# - /etc/resolv.conf  → DNS resolution works (needed for Neon, Resend)
+# - /etc/ssl/certs    → TLS certificates included
+# - /etc/passwd       → non-root user support
+# Final image size: ~5MB
+FROM gcr.io/distroless/static:nonroot
 
 # Copy only the compiled binary from the builder stage.
 COPY --from=builder /bin/api /api
 
-# Copy TLS certificates so the binary can make HTTPS calls (e.g. to Resend).
-# scratch has no system certs, so we bring them from the builder.
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-# The port our API listens on. This is documentation — Fly.io also reads it.
 EXPOSE 8080
 
-# The command to run when the container starts.
 ENTRYPOINT ["/api"]
