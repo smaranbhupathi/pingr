@@ -35,6 +35,8 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
+		// Only fatal if the file exists but is malformed.
+		// Missing file is handled inside Load() with a warning + defaults.
 		slog.Error("failed to load config.yaml", "error", err)
 		os.Exit(1)
 	}

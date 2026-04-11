@@ -39,8 +39,30 @@ type Config struct {
 	Monitoring Monitoring `yaml:"monitoring"`
 }
 
-// Load reads config.yaml from path. The path defaults to "./config.yaml" and
-// can be overridden via the CONFIG_PATH env var.
+// defaults returns a Config with all features enabled and sensible monitoring values.
+// Used when config.yaml is missing so the service starts without a file on first run.
+func defaults() *Config {
+	return &Config{
+		Features: Features{
+			EmailAlerts:       true,
+			SlackAlerts:       true,
+			DiscordAlerts:     true,
+			AvatarUploads:     true,
+			PublicStatusPages: true,
+			EmailVerification: true,
+			PasswordReset:     true,
+		},
+		Monitoring: Monitoring{
+			WorkerTickSeconds:           10,
+			DefaultCheckIntervalSeconds: 60,
+			MaxResponseTimeMs:           30000,
+		},
+	}
+}
+
+// Load reads config.yaml. Path defaults to "./config.yaml" and can be overridden
+// via CONFIG_PATH. If the file does not exist the service starts with defaults
+// (all features on) and logs a warning — it never hard-crashes on a missing file.
 func Load() (*Config, error) {
 	path := os.Getenv("CONFIG_PATH")
 	if path == "" {
@@ -48,17 +70,22 @@ func Load() (*Config, error) {
 	}
 
 	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		// Not fatal — fall back to defaults so the service still starts.
+		fmt.Printf("WARN: %s not found, using built-in defaults (all features enabled)\n", path)
+		return defaults(), nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
 	defer f.Close()
 
-	var cfg Config
-	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+	cfg := defaults() // start from defaults so missing yaml keys don't zero out
+	if err := yaml.NewDecoder(f).Decode(cfg); err != nil {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
 
-	// Apply safe defaults so a partially-written config doesn't silently break things
+	// Re-apply monitoring floor values in case yaml had zeros
 	if cfg.Monitoring.WorkerTickSeconds == 0 {
 		cfg.Monitoring.WorkerTickSeconds = 10
 	}
@@ -69,5 +96,5 @@ func Load() (*Config, error) {
 		cfg.Monitoring.MaxResponseTimeMs = 30000
 	}
 
-	return &cfg, nil
+	return cfg, nil
 }
