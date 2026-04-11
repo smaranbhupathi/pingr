@@ -200,6 +200,9 @@ func (m *mockCheckRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID,
 func (m *mockCheckRepo) GetUptimeStats(ctx context.Context, monitorID uuid.UUID, from time.Time) (float64, error) {
 	return 100.0, nil
 }
+func (m *mockCheckRepo) GetDailyUptime(ctx context.Context, monitorID uuid.UUID, days int) ([]domain.DailyUptimeStat, error) {
+	return nil, nil
+}
 func (m *mockCheckRepo) GetLatest(ctx context.Context, monitorID uuid.UUID) (*domain.MonitorCheck, error) {
 	return nil, nil
 }
@@ -209,13 +212,31 @@ func (m *mockCheckRepo) GetLatest(ctx context.Context, monitorID uuid.UUID) (*do
 type mockIncidentRepo struct{}
 
 func (m *mockIncidentRepo) Create(ctx context.Context, incident *domain.Incident) error { return nil }
+func (m *mockIncidentRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error) {
+	return nil, errNotFound
+}
+func (m *mockIncidentRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error) {
+	return nil, nil
+}
+func (m *mockIncidentRepo) ListByMonitor(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error) {
+	return nil, nil
+}
+func (m *mockIncidentRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.IncidentStatus, resolvedAt *time.Time) error {
+	return nil
+}
+func (m *mockIncidentRepo) AddUpdate(ctx context.Context, update *domain.IncidentUpdate) error {
+	return nil
+}
+func (m *mockIncidentRepo) GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]domain.IncidentUpdate, error) {
+	return nil, nil
+}
 func (m *mockIncidentRepo) GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error) {
 	return nil, errNotFound
 }
-func (m *mockIncidentRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error) {
-	return nil, nil
+func (m *mockIncidentRepo) GetByOutageEventID(ctx context.Context, outageEventID uuid.UUID) (*domain.Incident, error) {
+	return nil, errNotFound
 }
-func (m *mockIncidentRepo) Resolve(ctx context.Context, incidentID uuid.UUID, resolvedAt time.Time) error {
+func (m *mockIncidentRepo) Resolve(ctx context.Context, incidentID uuid.UUID) error {
 	return nil
 }
 
@@ -246,6 +267,32 @@ func (m *mockAlertChannelRepo) GetByUserID(ctx context.Context, userID uuid.UUID
 
 func (m *mockAlertChannelRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.AlertChannel, error) {
 	return nil, nil
+}
+
+func (m *mockAlertChannelRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.AlertChannel, error) {
+	ch, ok := m.channels[id]
+	if !ok || ch.UserID != userID {
+		return nil, errNotFound
+	}
+	return ch, nil
+}
+
+func (m *mockAlertChannelRepo) UpdateName(ctx context.Context, id, userID uuid.UUID, name string) error {
+	ch, ok := m.channels[id]
+	if !ok || ch.UserID != userID {
+		return errNotFound
+	}
+	ch.Name = name
+	return nil
+}
+
+func (m *mockAlertChannelRepo) UpdateEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error {
+	ch, ok := m.channels[id]
+	if !ok || ch.UserID != userID {
+		return errNotFound
+	}
+	ch.IsEnabled = enabled
+	return nil
 }
 
 func (m *mockAlertChannelRepo) Delete(ctx context.Context, id uuid.UUID) error {
