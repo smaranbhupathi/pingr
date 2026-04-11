@@ -1,14 +1,15 @@
 import { NavLink, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { userApi } from '../../api/user'
-import { Activity, Bell, BookOpen, ExternalLink } from 'lucide-react'
+import { Activity, Bell, BookOpen, ExternalLink, Settings } from 'lucide-react'
 import { Footer } from '../ui/Footer'
 import { UserMenu } from '../ui/UserMenu'
 
 const navItems = [
-  { to: '/dashboard', label: 'Monitors', icon: Activity, exact: true },
-  { to: '/dashboard/alert-channels', label: 'Alert Channels', icon: Bell, exact: false },
-  { to: '/docs', label: 'Docs', icon: BookOpen, exact: false },
+  { to: '/dashboard',               label: 'Monitors',       icon: Activity,  exact: true },
+  { to: '/dashboard/alert-channels',label: 'Alert Channels', icon: Bell,      exact: false },
+  { to: '/docs',                     label: 'Docs',           icon: BookOpen,  exact: false },
+  { to: '/dashboard/settings',       label: 'Settings',       icon: Settings,  exact: false },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -18,12 +19,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   })
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
+      <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/50 flex flex-col shrink-0">
         {/* Brand */}
-        <div className="px-5 py-4 border-b border-gray-100">
-          <Link to="/" className="text-xl font-bold text-indigo-600">Pingr</Link>
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50">
+          <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Pingr</Link>
         </div>
 
         {/* Nav links */}
@@ -36,8 +37,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                 }`
               }
             >
@@ -51,7 +52,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               href={`/status/${profile.username}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             >
               <ExternalLink size={16} />
               Status Page
@@ -63,7 +64,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Right side */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Top header */}
-        <header className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-end shrink-0">
+        <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 flex items-center justify-end shrink-0">
           <UserMenu />
         </header>
 
