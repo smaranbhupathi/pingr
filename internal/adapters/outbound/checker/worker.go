@@ -194,6 +194,7 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 			"monitor_id", monitor.ID,
 			"monitor_name", monitor.Name,
 			"url", monitor.URL,
+			"outage_event_id", outageEvent.ID,
 		)
 		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, OutageEvent: *outageEvent, Type: domain.AlertEventDown})
 		return
@@ -218,6 +219,7 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 			"monitor_id", monitor.ID,
 			"monitor_name", monitor.Name,
 			"url", monitor.URL,
+			"outage_event_id", outageEvent.ID,
 		)
 		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, OutageEvent: *outageEvent, Type: domain.AlertEventRecovery})
 	}
@@ -260,10 +262,16 @@ func (w *Worker) autoResolveIncident(ctx context.Context, outageEventID uuid.UUI
 	// leaving any other open manual incidents for the same monitor untouched.
 	inc, err := w.incidents.GetByOutageEventID(ctx, outageEventID)
 	if err != nil {
-		return // no incident was created for this outage event, nothing to do
+		slog.Warn("auto-resolve: no incident linked to outage event (may have been manually resolved or never created)",
+			"outage_event_id", outageEventID,
+			"monitor_name", monitorName,
+			"error", err,
+		)
+		return
 	}
 	if inc.ResolvedAt != nil {
 		// Operator already resolved it manually — respect that, don't overwrite.
+		slog.Debug("auto-resolve: incident already resolved manually, skipping", "incident_id", inc.ID)
 		return
 	}
 
@@ -281,7 +289,9 @@ func (w *Worker) autoResolveIncident(ctx context.Context, outageEventID uuid.UUI
 	}
 	if err := w.incidents.Resolve(ctx, inc.ID); err != nil {
 		slog.Error("auto-resolve incident failed", "incident_id", inc.ID, "error", err)
+		return
 	}
+	slog.Info("incident auto-resolved", "incident_id", inc.ID, "monitor_name", monitorName)
 }
 
 func (w *Worker) sendAlerts(ctx context.Context, event domain.AlertEvent) {
