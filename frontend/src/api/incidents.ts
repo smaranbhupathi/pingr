@@ -1,4 +1,4 @@
-import { api } from './client'
+import { client as api } from './client'
 
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
 
