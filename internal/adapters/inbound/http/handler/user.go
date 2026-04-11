@@ -117,6 +117,65 @@ func (h *UserHandler) ListAlertChannels(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, channels)
 }
 
+func (h *UserHandler) GetAlertChannel(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	channelID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid channel id")
+		return
+	}
+
+	ch, err := h.users.GetAlertChannel(r.Context(), channelID, userID)
+	if err != nil {
+		if errors.Is(err, services.ErrAlertChannelNotFound) {
+			Error(w, http.StatusNotFound, "alert channel not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to get alert channel")
+		return
+	}
+
+	JSON(w, http.StatusOK, ch)
+}
+
+func (h *UserHandler) UpdateAlertChannel(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	channelID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid channel id")
+		return
+	}
+
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.users.UpdateAlertChannelName(r.Context(), channelID, userID, body.Name); err != nil {
+		if errors.Is(err, services.ErrAlertChannelNotFound) {
+			Error(w, http.StatusNotFound, "alert channel not found")
+			return
+		}
+		Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *UserHandler) DeleteAlertChannel(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

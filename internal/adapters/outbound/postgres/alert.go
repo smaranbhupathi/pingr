@@ -57,6 +57,31 @@ func (r *alertChannelRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UU
 	return scanAlertChannels(rows)
 }
 
+func (r *alertChannelRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.AlertChannel, error) {
+	row := r.db.QueryRow(ctx,
+		`SELECT id, user_id, name, type, config, is_default, created_at
+		 FROM alert_channels WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`,
+		id, userID,
+	)
+	var ch domain.AlertChannel
+	var configJSON []byte
+	if err := row.Scan(&ch.ID, &ch.UserID, &ch.Name, &ch.Type, &configJSON, &ch.IsDefault, &ch.CreatedAt); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(configJSON, &ch.Config); err != nil {
+		return nil, err
+	}
+	return &ch, nil
+}
+
+func (r *alertChannelRepo) UpdateName(ctx context.Context, id, userID uuid.UUID, name string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE alert_channels SET name=$1 WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL`,
+		name, id, userID,
+	)
+	return err
+}
+
 func (r *alertChannelRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `UPDATE alert_channels SET deleted_at = NOW() WHERE id=$1 AND deleted_at IS NULL`, id)
 	return err

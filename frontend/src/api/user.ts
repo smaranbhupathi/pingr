@@ -40,6 +40,12 @@ export const userApi = {
   createAlertChannel: (name: string, type: string, config: Record<string, string>, is_default = false) =>
     client.post<AlertChannel>('/alert-channels', { name, type, config, is_default }),
 
+  getAlertChannel: (id: string) =>
+    client.get<AlertChannel>(`/alert-channels/${id}`),
+
+  updateAlertChannel: (id: string, name: string) =>
+    client.patch(`/alert-channels/${id}`, { name }),
+
   deleteAlertChannel: (id: string) =>
     client.delete(`/alert-channels/${id}`),
 

@@ -11,6 +11,7 @@ import { VerifyEmailPage } from './pages/auth/VerifyEmail'
 import { DashboardPage } from './pages/dashboard/Dashboard'
 import { MonitorDetailPage } from './pages/dashboard/MonitorDetail'
 import { AlertChannelsPage } from './pages/dashboard/AlertChannels'
+import { AlertChannelDetailPage } from './pages/dashboard/AlertChannelDetail'
 import { ProfilePage } from './pages/dashboard/Profile'
 import { StatusPage } from './pages/status/StatusPage'
 import { DocsPage } from './pages/Docs'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
           <Route path="/dashboard/monitors/:id" element={<RequireAuth><MonitorDetailPage /></RequireAuth>} />
           <Route path="/dashboard/alert-channels" element={<RequireAuth><AlertChannelsPage /></RequireAuth>} />
+          <Route path="/dashboard/alert-channels/:id" element={<RequireAuth><AlertChannelDetailPage /></RequireAuth>} />
           <Route path="/dashboard/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
 
           {/* Fallback */}

@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userApi } from '../../api/user'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
-import { Bell, Trash2 } from 'lucide-react'
+import { Bell, ChevronRight, Trash2 } from 'lucide-react'
 
 type ChannelType = 'email' | 'slack' | 'discord'
 
@@ -14,8 +15,20 @@ const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: string; placeho
   { type: 'discord', label: 'Discord', icon: '🎮',  placeholder: 'https://discord.com/api/webhooks/...' },
 ]
 
-function channelLabel(ch: { name: string; type: string; config: Record<string, string> }) {
-  return ch.name || (ch.type === 'email' ? ch.config.email : ch.type)
+function channelDisplayName(ch: { name: string; type: string; config: Record<string, string> }) {
+  if (ch.name) return ch.name
+  if (ch.type === 'email') return ch.config.email || 'Email channel'
+  const label = CHANNEL_OPTIONS.find(o => o.type === ch.type)?.label ?? ch.type
+  return `${label} webhook`
+}
+
+function channelSubtitle(ch: { name: string; type: string; config: Record<string, string> }) {
+  const typeLabel = CHANNEL_OPTIONS.find(o => o.type === ch.type)?.label ?? ch.type
+  if (ch.type === 'email') return `${typeLabel} · ${ch.config.email || ''}`
+  const url = ch.config.webhook_url || ''
+  // Show just the domain part of the webhook URL to keep it short
+  const short = url ? new URL(url).hostname : ''
+  return `${typeLabel}${short ? ` · ${short}` : ''}`
 }
 
 function channelIcon(type: string) {
@@ -144,19 +157,26 @@ export function AlertChannelsSection() {
       ) : (
         <div className="space-y-2">
           {channels.map(ch => (
-            <Card key={ch.id} className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-lg">{channelIcon(ch.type)}</span>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{channelLabel(ch)}</p>
-                  <p className="text-xs text-gray-400 capitalize">
-                    {ch.type}{ch.is_default ? ' · Default' : ''}
+            <Card key={ch.id} className="p-4 flex items-center justify-between group hover:border-indigo-200 transition-colors">
+              <Link
+                to={`/dashboard/alert-channels/${ch.id}`}
+                className="flex items-center gap-3 flex-1 min-w-0"
+              >
+                <span className="text-lg shrink-0">{channelIcon(ch.type)}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {channelDisplayName(ch)}
+                    {ch.is_default && (
+                      <span className="ml-2 text-xs font-normal text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">Default</span>
+                    )}
                   </p>
+                  <p className="text-xs text-gray-400 truncate">{channelSubtitle(ch)}</p>
                 </div>
-              </div>
+                <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400 shrink-0 ml-auto mr-2" />
+              </Link>
               <button
                 onClick={() => deleteMutation.mutate(ch.id)}
-                className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 shrink-0"
                 title="Delete channel"
               >
                 <Trash2 size={16} />

@@ -132,8 +132,26 @@ func (s *userService) CreateAlertChannel(ctx context.Context, input inbound.Crea
 	return ch, nil
 }
 
+func (s *userService) GetAlertChannel(ctx context.Context, channelID, userID uuid.UUID) (*domain.AlertChannel, error) {
+	ch, err := s.alertChannels.GetByID(ctx, channelID, userID)
+	if err != nil {
+		return nil, ErrAlertChannelNotFound
+	}
+	return ch, nil
+}
+
 func (s *userService) ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error) {
 	return s.alertChannels.GetByUserID(ctx, userID)
+}
+
+func (s *userService) UpdateAlertChannelName(ctx context.Context, channelID, userID uuid.UUID, name string) error {
+	if name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if err := s.alertChannels.UpdateName(ctx, channelID, userID, name); err != nil {
+		return fmt.Errorf("update alert channel name: %w", err)
+	}
+	return nil
 }
 
 func (s *userService) DeleteAlertChannel(ctx context.Context, channelID, userID uuid.UUID) error {

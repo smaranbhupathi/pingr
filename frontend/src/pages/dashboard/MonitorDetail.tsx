@@ -213,7 +213,7 @@ function SubscribeSection({ monitorId }: { monitorId: string }) {
           {subscribed.map(ch => (
             <div key={ch.id} className="flex items-center gap-2 text-sm text-gray-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
               <CheckCircle size={14} className="text-green-500 shrink-0" />
-              <span>{ch.name || ch.config.email || ch.type}</span>
+              <span>{ch.name || (ch.type === 'email' ? ch.config.email : null) || `${ch.type} webhook`}</span>
               <span className="text-xs text-gray-400 ml-auto mr-2 capitalize">{ch.type} · subscribed</span>
               <button
                 onClick={() => unsubscribeMutation.mutate(ch.id)}
@@ -246,11 +246,16 @@ function SubscribeSection({ monitorId }: { monitorId: string }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Select a channel…</option>
-              {available.map(ch => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.name || ch.config.email || ch.type} ({ch.type})
-                </option>
-              ))}
+              {available.map(ch => {
+                const displayName = ch.name
+                  || (ch.type === 'email' ? ch.config.email : null)
+                  || `${ch.type} webhook`
+                return (
+                  <option key={ch.id} value={ch.id}>
+                    {displayName} ({ch.type})
+                  </option>
+                )
+              })}
             </select>
           </div>
           <Button

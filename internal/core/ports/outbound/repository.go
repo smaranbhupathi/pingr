@@ -50,8 +50,10 @@ type IncidentRepository interface {
 
 type AlertChannelRepository interface {
 	Create(ctx context.Context, channel *domain.AlertChannel) error
+	GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.AlertChannel, error)
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
 	GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.AlertChannel, error)
+	UpdateName(ctx context.Context, id, userID uuid.UUID, name string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

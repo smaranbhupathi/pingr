@@ -67,7 +67,9 @@ type UserService interface {
 	// UpdateAvatar persists the public URL returned after a successful upload.
 	UpdateAvatar(ctx context.Context, userID uuid.UUID, publicURL string) error
 	CreateAlertChannel(ctx context.Context, input CreateAlertChannelInput) (*domain.AlertChannel, error)
+	GetAlertChannel(ctx context.Context, channelID, userID uuid.UUID) (*domain.AlertChannel, error)
 	ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
+	UpdateAlertChannelName(ctx context.Context, channelID, userID uuid.UUID, name string) error
 	DeleteAlertChannel(ctx context.Context, channelID, userID uuid.UUID) error
 	SubscribeMonitorToChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
 	UnsubscribeMonitorFromChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
