@@ -22,11 +22,11 @@ var (
 const defaultRegion = "sin" // Singapore — matches Railway worker region
 
 type monitorService struct {
-	monitors  outbound.MonitorRepository
-	checks    outbound.CheckRepository
-	incidents outbound.IncidentRepository
-	users     outbound.UserRepository
-	plans     outbound.PlanRepository
+	monitors     outbound.MonitorRepository
+	checks       outbound.CheckRepository
+	incidents    outbound.IncidentRepository
+	users        outbound.UserRepository
+	plans        outbound.PlanRepository
 }
 
 func NewMonitorService(
@@ -191,7 +191,13 @@ func (s *monitorService) buildDetail(ctx context.Context, monitor domain.Monitor
 	u90d, _ := s.checks.GetUptimeStats(ctx, monitor.ID, now.Add(-90*24*time.Hour))
 
 	latest, _ := s.checks.GetLatest(ctx, monitor.ID)
-	incidents, _ := s.incidents.GetByMonitorID(ctx, monitor.ID)
+	incidents, _ := s.incidents.ListByMonitor(ctx, monitor.ID)
+
+	var activeIncident *domain.Incident
+	openInc, err := s.incidents.GetOpenByMonitorID(ctx, monitor.ID)
+	if err == nil && openInc != nil {
+		activeIncident = openInc
+	}
 
 	return &inbound.MonitorDetail{
 		Monitor: monitor,
@@ -201,7 +207,8 @@ func (s *monitorService) buildDetail(ctx context.Context, monitor domain.Monitor
 			Last30d: u30d,
 			Last90d: u90d,
 		},
-		RecentCheck: latest,
-		Incidents:   incidents,
+		RecentCheck:    latest,
+		Incidents:      incidents,
+		ActiveIncident: activeIncident,
 	}, nil
 }

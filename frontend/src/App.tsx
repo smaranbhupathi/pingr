@@ -15,6 +15,8 @@ import { AlertChannelsPage } from './pages/dashboard/AlertChannels'
 import { AlertChannelDetailPage } from './pages/dashboard/AlertChannelDetail'
 import { ProfilePage } from './pages/dashboard/Profile'
 import { SettingsPage } from './pages/dashboard/Settings'
+import { IncidentsPage } from './pages/dashboard/IncidentsPage'
+import { IncidentDetailPage } from './pages/dashboard/IncidentDetail'
 import { StatusPage } from './pages/status/StatusPage'
 import { DocsPage } from './pages/Docs'
 
@@ -57,6 +59,8 @@ export default function App() {
             <Route path="/dashboard/alert-channels/:id" element={<RequireAuth><AlertChannelDetailPage /></RequireAuth>} />
             <Route path="/dashboard/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
             <Route path="/dashboard/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+            <Route path="/dashboard/incidents" element={<RequireAuth><IncidentsPage /></RequireAuth>} />
+            <Route path="/dashboard/incidents/:id" element={<RequireAuth><IncidentDetailPage /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

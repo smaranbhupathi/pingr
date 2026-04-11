@@ -110,12 +110,13 @@ func main() {
 		webhook.NewSlackNotifier(),
 		webhook.NewDiscordNotifier(),
 	}
-	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender, storageSvc, webhookNotifiers)
+	userSvc := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, incidentRepo, emailSender, storageSvc, webhookNotifiers)
 
 	// HTTP handlers
-	authH    := handler.NewAuthHandler(authSvc, log)
-	monitorH := handler.NewMonitorHandler(monitorSvc, log)
-	userH    := handler.NewUserHandler(userSvc, cfg, log)
+	authH     := handler.NewAuthHandler(authSvc, log)
+	monitorH  := handler.NewMonitorHandler(monitorSvc, log)
+	userH     := handler.NewUserHandler(userSvc, cfg, log)
+	incidentH := handler.NewIncidentHandler(userSvc, log)
 
 	// Rate limiter — in-memory sliding window.
 	// To switch to Redis: replace NewMemoryStore() with NewRedisStore(redisClient).
@@ -125,7 +126,7 @@ func main() {
 	log.Info("rate limiter initialised", "store", "memory")
 
 	allowedOrigin := envOr("ALLOWED_ORIGIN", "*")
-	router := inboundhttp.NewRouter(authH, monitorH, userH, mustEnv("JWT_SECRET"), allowedOrigin, rlStore, log)
+	router := inboundhttp.NewRouter(authH, monitorH, userH, incidentH, mustEnv("JWT_SECRET"), allowedOrigin, rlStore, log)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

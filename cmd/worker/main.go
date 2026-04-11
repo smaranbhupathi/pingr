@@ -53,6 +53,7 @@ func main() {
 	// Repositories
 	monitorRepo      := postgres.NewMonitorRepository(db)
 	checkRepo        := postgres.NewCheckRepository(db)
+	outageEventRepo  := postgres.NewOutageEventRepository(db)
 	incidentRepo     := postgres.NewIncidentRepository(db)
 	alertChannelRepo := postgres.NewAlertChannelRepository(db)
 
@@ -82,6 +83,7 @@ func main() {
 		region,
 		monitorRepo,
 		checkRepo,
+		outageEventRepo,
 		incidentRepo,
 		alertChannelRepo,
 		checkers,

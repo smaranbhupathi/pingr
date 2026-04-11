@@ -196,7 +196,43 @@ func (r *checkRepo) GetLatest(ctx context.Context, monitorID uuid.UUID) (*domain
 	return &c, nil
 }
 
-// --- Incident Repository ---
+// --- OutageEvent Repository (worker-internal, used for uptime math) ---
+
+type outageEventRepo struct{ db *pgxpool.Pool }
+
+func NewOutageEventRepository(db *pgxpool.Pool) outbound.OutageEventRepository {
+	return &outageEventRepo{db: db}
+}
+
+func (r *outageEventRepo) Create(ctx context.Context, e *domain.OutageEvent) error {
+	_, err := r.db.Exec(ctx,
+		`INSERT INTO outage_events (id, monitor_id, started_at) VALUES ($1,$2,$3)`,
+		e.ID, e.MonitorID, e.StartedAt,
+	)
+	return err
+}
+
+func (r *outageEventRepo) GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.OutageEvent, error) {
+	var e domain.OutageEvent
+	err := r.db.QueryRow(ctx,
+		`SELECT id, monitor_id, started_at, resolved_at FROM outage_events WHERE monitor_id=$1 AND resolved_at IS NULL`,
+		monitorID,
+	).Scan(&e.ID, &e.MonitorID, &e.StartedAt, &e.ResolvedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+func (r *outageEventRepo) Resolve(ctx context.Context, eventID uuid.UUID, resolvedAt time.Time) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE outage_events SET resolved_at=$2 WHERE id=$1`,
+		eventID, resolvedAt,
+	)
+	return err
+}
+
+// --- Incident Repository (user-facing, shown on status page) ---
 
 type incidentRepo struct{ db *pgxpool.Pool }
 
@@ -204,51 +240,193 @@ func NewIncidentRepository(db *pgxpool.Pool) outbound.IncidentRepository {
 	return &incidentRepo{db: db}
 }
 
-func (r *incidentRepo) Create(ctx context.Context, i *domain.Incident) error {
+func (r *incidentRepo) Create(ctx context.Context, inc *domain.Incident) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO incidents (id, user_id, name, status, source, resolved_at, created_at, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		inc.ID, inc.UserID, inc.Name, inc.Status, inc.Source, inc.ResolvedAt, inc.CreatedAt, inc.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, mID := range inc.MonitorIDs {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO incident_affected_monitors (incident_id, monitor_id) VALUES ($1,$2)`,
+			inc.ID, mID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *incidentRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error) {
+	inc, err := r.scanOne(r.db.QueryRow(ctx,
+		`SELECT id, user_id, name, status, source, resolved_at, created_at, updated_at
+		 FROM incidents WHERE id=$1 AND user_id=$2`, id, userID,
+	))
+	if err != nil {
+		return nil, err
+	}
+	if err := r.attachDetails(ctx, inc); err != nil {
+		return nil, err
+	}
+	return inc, nil
+}
+
+func (r *incidentRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, user_id, name, status, source, resolved_at, created_at, updated_at
+		 FROM incidents WHERE user_id=$1 ORDER BY created_at DESC`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return r.scanMany(ctx, rows)
+}
+
+func (r *incidentRepo) ListByMonitor(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT i.id, i.user_id, i.name, i.status, i.source, i.resolved_at, i.created_at, i.updated_at
+		 FROM incidents i
+		 JOIN incident_affected_monitors iam ON iam.incident_id = i.id
+		 WHERE iam.monitor_id=$1
+		 ORDER BY i.created_at DESC LIMIT 20`, monitorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return r.scanMany(ctx, rows)
+}
+
+func (r *incidentRepo) GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error) {
+	inc, err := r.scanOne(r.db.QueryRow(ctx,
+		`SELECT i.id, i.user_id, i.name, i.status, i.source, i.resolved_at, i.created_at, i.updated_at
+		 FROM incidents i
+		 JOIN incident_affected_monitors iam ON iam.incident_id = i.id
+		 WHERE iam.monitor_id=$1 AND i.resolved_at IS NULL
+		 ORDER BY i.created_at DESC LIMIT 1`, monitorID,
+	))
+	if err != nil {
+		return nil, err
+	}
+	return inc, nil
+}
+
+func (r *incidentRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.IncidentStatus, resolvedAt *time.Time) error {
 	_, err := r.db.Exec(ctx,
-		`INSERT INTO incidents (id, monitor_id, started_at) VALUES ($1,$2,$3)`,
-		i.ID, i.MonitorID, i.StartedAt,
+		`UPDATE incidents SET status=$2, resolved_at=$3, updated_at=NOW() WHERE id=$1`,
+		id, status, resolvedAt,
 	)
 	return err
 }
 
-func (r *incidentRepo) GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error) {
-	var i domain.Incident
-	err := r.db.QueryRow(ctx,
-		`SELECT id, monitor_id, started_at, resolved_at FROM incidents WHERE monitor_id=$1 AND resolved_at IS NULL`,
-		monitorID,
-	).Scan(&i.ID, &i.MonitorID, &i.StartedAt, &i.ResolvedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &i, nil
+func (r *incidentRepo) AddUpdate(ctx context.Context, u *domain.IncidentUpdate) error {
+	_, err := r.db.Exec(ctx,
+		`INSERT INTO incident_updates (id, incident_id, status, message, notify, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6)`,
+		u.ID, u.IncidentID, u.Status, u.Message, u.Notify, u.CreatedAt,
+	)
+	return err
 }
 
-func (r *incidentRepo) GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error) {
+func (r *incidentRepo) GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]domain.IncidentUpdate, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, monitor_id, started_at, resolved_at FROM incidents WHERE monitor_id=$1 ORDER BY started_at DESC LIMIT 50`,
-		monitorID,
+		`SELECT id, incident_id, status, message, notify, created_at
+		 FROM incident_updates WHERE incident_id=$1 ORDER BY created_at ASC`, incidentID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	incidents := make([]domain.Incident, 0)
+	updates := make([]domain.IncidentUpdate, 0)
 	for rows.Next() {
-		var i domain.Incident
-		if err := rows.Scan(&i.ID, &i.MonitorID, &i.StartedAt, &i.ResolvedAt); err != nil {
+		var u domain.IncidentUpdate
+		if err := rows.Scan(&u.ID, &u.IncidentID, &u.Status, &u.Message, &u.Notify, &u.CreatedAt); err != nil {
 			return nil, err
 		}
-		incidents = append(incidents, i)
+		updates = append(updates, u)
 	}
-	return incidents, rows.Err()
+	return updates, rows.Err()
 }
 
-func (r *incidentRepo) Resolve(ctx context.Context, incidentID uuid.UUID, resolvedAt time.Time) error {
+func (r *incidentRepo) Resolve(ctx context.Context, incidentID uuid.UUID) error {
+	now := time.Now()
 	_, err := r.db.Exec(ctx,
-		`UPDATE incidents SET resolved_at=$2 WHERE id=$1`,
-		incidentID, resolvedAt,
+		`UPDATE incidents SET status='resolved', resolved_at=$2, updated_at=$2 WHERE id=$1`,
+		incidentID, now,
 	)
 	return err
+}
+
+// scanOne scans a single incident row (no updates or monitors attached yet).
+func (r *incidentRepo) scanOne(row interface {
+	Scan(...any) error
+}) (*domain.Incident, error) {
+	var inc domain.Incident
+	if err := row.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &inc, nil
+}
+
+func (r *incidentRepo) scanMany(ctx context.Context, rows interface {
+	Next() bool
+	Scan(...any) error
+	Err() error
+}) ([]domain.Incident, error) {
+	incidents := make([]domain.Incident, 0)
+	for rows.Next() {
+		var inc domain.Incident
+		if err := rows.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
+			return nil, err
+		}
+		incidents = append(incidents, inc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Attach updates + monitor IDs for each
+	for i := range incidents {
+		if err := r.attachDetails(ctx, &incidents[i]); err != nil {
+			return nil, err
+		}
+	}
+	return incidents, nil
+}
+
+func (r *incidentRepo) attachDetails(ctx context.Context, inc *domain.Incident) error {
+	updates, err := r.GetUpdates(ctx, inc.ID)
+	if err != nil {
+		return err
+	}
+	inc.Updates = updates
+
+	rows, err := r.db.Query(ctx,
+		`SELECT monitor_id FROM incident_affected_monitors WHERE incident_id=$1`, inc.ID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var mID uuid.UUID
+		if err := rows.Scan(&mID); err != nil {
+			return err
+		}
+		inc.MonitorIDs = append(inc.MonitorIDs, mID)
+	}
+	return rows.Err()
 }

@@ -41,11 +41,24 @@ type CheckRepository interface {
 	GetLatest(ctx context.Context, monitorID uuid.UUID) (*domain.MonitorCheck, error)
 }
 
+// OutageEventRepository is used by the worker for uptime math and alert triggering.
+type OutageEventRepository interface {
+	Create(ctx context.Context, event *domain.OutageEvent) error
+	GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.OutageEvent, error)
+	Resolve(ctx context.Context, eventID uuid.UUID, resolvedAt time.Time) error
+}
+
+// IncidentRepository manages user-facing incidents shown on the public status page.
 type IncidentRepository interface {
 	Create(ctx context.Context, incident *domain.Incident) error
+	GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error)
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error)
+	ListByMonitor(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.IncidentStatus, resolvedAt *time.Time) error
+	AddUpdate(ctx context.Context, update *domain.IncidentUpdate) error
+	GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]domain.IncidentUpdate, error)
 	GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error)
-	GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error)
-	Resolve(ctx context.Context, incidentID uuid.UUID, resolvedAt time.Time) error
+	Resolve(ctx context.Context, incidentID uuid.UUID) error
 }
 
 type AlertChannelRepository interface {

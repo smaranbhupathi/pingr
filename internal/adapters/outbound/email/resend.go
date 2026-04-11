@@ -163,7 +163,7 @@ func (n *emailNotifier) Send(ctx context.Context, event domain.AlertEvent, confi
 			event.Monitor.Name,
 			event.Monitor.Name,
 			event.Monitor.URL,
-			event.Incident.StartedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	case domain.AlertEventRecovery:
 		subject = fmt.Sprintf("🟢 %s is back UP", event.Monitor.Name)
@@ -188,7 +188,7 @@ func (n *emailNotifier) Send(ctx context.Context, event domain.AlertEvent, confi
 			event.Monitor.Name,
 			event.Monitor.Name,
 			event.Monitor.URL,
-			event.Incident.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	default:
 		return fmt.Errorf("unknown alert event type: %s", event.Type)

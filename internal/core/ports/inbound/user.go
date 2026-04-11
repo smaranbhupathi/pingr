@@ -59,6 +59,23 @@ func (i CreateAlertChannelInput) Validate() map[string]string {
 	return errs
 }
 
+type CreateIncidentInput struct {
+	UserID     uuid.UUID
+	Name       string
+	Status     domain.IncidentStatus
+	Message    string
+	MonitorIDs []uuid.UUID
+	Notify     bool
+}
+
+type PostIncidentUpdateInput struct {
+	IncidentID uuid.UUID
+	UserID     uuid.UUID
+	Status     domain.IncidentStatus
+	Message    string
+	Notify     bool
+}
+
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*UserProfile, error)
 	// AvatarUploadURL generates a short-lived presigned PUT URL for the browser
@@ -75,4 +92,10 @@ type UserService interface {
 	SubscribeMonitorToChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
 	UnsubscribeMonitorFromChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
 	ListMonitorSubscriptions(ctx context.Context, monitorID, userID uuid.UUID) ([]domain.AlertChannel, error)
+
+	// Incidents
+	CreateIncident(ctx context.Context, input CreateIncidentInput) (*domain.Incident, error)
+	GetIncident(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error)
+	ListIncidents(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error)
+	PostIncidentUpdate(ctx context.Context, input PostIncidentUpdateInput) (*domain.Incident, error)
 }

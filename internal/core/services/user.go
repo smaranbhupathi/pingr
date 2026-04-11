@@ -19,12 +19,15 @@ var (
 	ErrAlreadySubscribed    = errors.New("monitor already subscribed to this channel")
 )
 
+var ErrIncidentNotFound = errors.New("incident not found")
+
 type userService struct {
 	users         outbound.UserRepository
 	plans         outbound.PlanRepository
 	alertChannels outbound.AlertChannelRepository
 	alertSubs     outbound.AlertSubscriptionRepository
 	monitors      outbound.MonitorRepository
+	incidents     outbound.IncidentRepository
 	email         outbound.EmailSender
 	storage       outbound.StorageService // nil when storage is not configured
 	notifiers     map[domain.AlertChannelType]outbound.Notifier
@@ -36,6 +39,7 @@ func NewUserService(
 	alertChannels outbound.AlertChannelRepository,
 	alertSubs outbound.AlertSubscriptionRepository,
 	monitors outbound.MonitorRepository,
+	incidents outbound.IncidentRepository,
 	email outbound.EmailSender,
 	storage outbound.StorageService,
 	notifiers []outbound.Notifier,
@@ -50,6 +54,7 @@ func NewUserService(
 		alertChannels: alertChannels,
 		alertSubs:     alertSubs,
 		monitors:      monitors,
+		incidents:     incidents,
 		email:         email,
 		storage:       storage,
 		notifiers:     notifierMap,
@@ -271,4 +276,79 @@ func (s *userService) UnsubscribeMonitorFromChannel(ctx context.Context, monitor
 	}
 
 	return s.alertSubs.DeleteByMonitorAndChannel(ctx, monitorID, channelID)
+}
+
+func (s *userService) CreateIncident(ctx context.Context, input inbound.CreateIncidentInput) (*domain.Incident, error) {
+	now := time.Now()
+	inc := &domain.Incident{
+		ID:         uuid.New(),
+		UserID:     input.UserID,
+		Name:       input.Name,
+		Status:     input.Status,
+		Source:     "manual",
+		MonitorIDs: input.MonitorIDs,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	if err := s.incidents.Create(ctx, inc); err != nil {
+		return nil, fmt.Errorf("create incident: %w", err)
+	}
+
+	update := &domain.IncidentUpdate{
+		ID:         uuid.New(),
+		IncidentID: inc.ID,
+		Status:     input.Status,
+		Message:    input.Message,
+		Notify:     input.Notify,
+		CreatedAt:  now,
+	}
+	if err := s.incidents.AddUpdate(ctx, update); err != nil {
+		return nil, fmt.Errorf("add initial incident update: %w", err)
+	}
+	inc.Updates = []domain.IncidentUpdate{*update}
+
+	return inc, nil
+}
+
+func (s *userService) GetIncident(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error) {
+	inc, err := s.incidents.GetByID(ctx, id, userID)
+	if err != nil {
+		return nil, ErrIncidentNotFound
+	}
+	return inc, nil
+}
+
+func (s *userService) ListIncidents(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error) {
+	return s.incidents.ListByUser(ctx, userID)
+}
+
+func (s *userService) PostIncidentUpdate(ctx context.Context, input inbound.PostIncidentUpdateInput) (*domain.Incident, error) {
+	inc, err := s.incidents.GetByID(ctx, input.IncidentID, input.UserID)
+	if err != nil {
+		return nil, ErrIncidentNotFound
+	}
+
+	now := time.Now()
+	update := &domain.IncidentUpdate{
+		ID:         uuid.New(),
+		IncidentID: inc.ID,
+		Status:     input.Status,
+		Message:    input.Message,
+		Notify:     input.Notify,
+		CreatedAt:  now,
+	}
+	if err := s.incidents.AddUpdate(ctx, update); err != nil {
+		return nil, fmt.Errorf("add incident update: %w", err)
+	}
+
+	var resolvedAt *time.Time
+	if input.Status == domain.IncidentStatusResolved {
+		resolvedAt = &now
+	}
+	if err := s.incidents.UpdateStatus(ctx, inc.ID, input.Status, resolvedAt); err != nil {
+		return nil, fmt.Errorf("update incident status: %w", err)
+	}
+
+	return s.incidents.GetByID(ctx, inc.ID, input.UserID)
 }

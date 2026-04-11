@@ -1,15 +1,16 @@
 import { NavLink, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { userApi } from '../../api/user'
-import { Activity, Bell, BookOpen, ExternalLink, Settings } from 'lucide-react'
+import { Activity, AlertTriangle, Bell, BookOpen, ExternalLink, Settings } from 'lucide-react'
 import { Footer } from '../ui/Footer'
 import { UserMenu } from '../ui/UserMenu'
 
 const navItems = [
-  { to: '/dashboard',               label: 'Monitors',       icon: Activity,  exact: true },
-  { to: '/dashboard/alert-channels',label: 'Alert Channels', icon: Bell,      exact: false },
-  { to: '/docs',                     label: 'Docs',           icon: BookOpen,  exact: false },
-  { to: '/dashboard/settings',       label: 'Settings',       icon: Settings,  exact: false },
+  { to: '/dashboard',                label: 'Monitors',       icon: Activity,       exact: true },
+  { to: '/dashboard/incidents',      label: 'Incidents',      icon: AlertTriangle,  exact: false },
+  { to: '/dashboard/alert-channels', label: 'Alert Channels', icon: Bell,           exact: false },
+  { to: '/docs',                     label: 'Docs',           icon: BookOpen,       exact: false },
+  { to: '/dashboard/settings',       label: 'Settings',       icon: Settings,       exact: false },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

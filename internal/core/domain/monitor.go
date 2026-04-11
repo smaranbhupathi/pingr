@@ -51,10 +51,47 @@ type MonitorCheck struct {
 	Region         string    `json:"region"`
 }
 
-type Incident struct {
+// OutageEvent is created automatically by the worker when a monitor goes down.
+// Used purely for uptime math and alert triggering — not directly shown in the UI.
+type OutageEvent struct {
 	ID         uuid.UUID      `json:"id"`
 	MonitorID  uuid.UUID      `json:"monitor_id"`
 	StartedAt  time.Time      `json:"started_at"`
 	ResolvedAt *time.Time     `json:"resolved_at"`
 	Duration   *time.Duration `json:"-"`
+}
+
+// IncidentStatus represents the lifecycle stage of an incident.
+type IncidentStatus string
+
+const (
+	IncidentStatusInvestigating IncidentStatus = "investigating"
+	IncidentStatusIdentified    IncidentStatus = "identified"
+	IncidentStatusMonitoring    IncidentStatus = "monitoring"
+	IncidentStatusResolved      IncidentStatus = "resolved"
+)
+
+// Incident is a user-facing communication object shown on the public status page.
+// It can be created manually by the operator or auto-seeded by the worker.
+type Incident struct {
+	ID         uuid.UUID      `json:"id"`
+	UserID     uuid.UUID      `json:"user_id"`
+	Name       string         `json:"name"`
+	Status     IncidentStatus `json:"status"`
+	Source     string         `json:"source"` // "manual" | "auto"
+	ResolvedAt *time.Time     `json:"resolved_at"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	Updates    []IncidentUpdate `json:"updates,omitempty"`
+	MonitorIDs []uuid.UUID    `json:"monitor_ids,omitempty"`
+}
+
+// IncidentUpdate is one entry in the incident timeline.
+type IncidentUpdate struct {
+	ID         uuid.UUID      `json:"id"`
+	IncidentID uuid.UUID      `json:"incident_id"`
+	Status     IncidentStatus `json:"status"`
+	Message    string         `json:"message"`
+	Notify     bool           `json:"notify"`
+	CreatedAt  time.Time      `json:"created_at"`
 }

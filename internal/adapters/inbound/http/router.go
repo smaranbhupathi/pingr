@@ -16,6 +16,7 @@ func NewRouter(
 	authH *handler.AuthHandler,
 	monitorH *handler.MonitorHandler,
 	userH *handler.UserHandler,
+	incidentH *handler.IncidentHandler,
 	jwtSecret string,
 	allowedOrigin string,
 	rlStore ratelimit.Store,
@@ -67,6 +68,14 @@ func NewRouter(
 			r.Get("/{id}", userH.GetAlertChannel)
 			r.Patch("/{id}", userH.UpdateAlertChannel)
 			r.Delete("/{id}", userH.DeleteAlertChannel)
+		})
+
+		// Incidents
+		r.Route("/incidents", func(r chi.Router) {
+			r.Get("/", incidentH.List)
+			r.Post("/", incidentH.Create)
+			r.Get("/{id}", incidentH.Get)
+			r.Post("/{id}/updates", incidentH.PostUpdate)
 		})
 
 		// Monitors

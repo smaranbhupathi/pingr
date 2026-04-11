@@ -57,14 +57,14 @@ func (n *slackNotifier) Send(ctx context.Context, event domain.AlertEvent, confi
 			event.Monitor.Name,
 			event.Monitor.URL,
 			event.Monitor.URL,
-			event.Incident.StartedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	case domain.AlertEventRecovery:
 		text = fmt.Sprintf("🟢 *%s* is back UP\n<%s|%s>\nRecovered at %s UTC",
 			event.Monitor.Name,
 			event.Monitor.URL,
 			event.Monitor.URL,
-			event.Incident.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	}
 
@@ -107,13 +107,13 @@ func (n *discordNotifier) Send(ctx context.Context, event domain.AlertEvent, con
 		content = fmt.Sprintf("🔴 **%s** is DOWN\n%s\nIncident started at %s UTC",
 			event.Monitor.Name,
 			event.Monitor.URL,
-			event.Incident.StartedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	case domain.AlertEventRecovery:
 		content = fmt.Sprintf("🟢 **%s** is back UP\n%s\nRecovered at %s UTC",
 			event.Monitor.Name,
 			event.Monitor.URL,
-			event.Incident.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
+			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
 		)
 	}
 

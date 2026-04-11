@@ -17,21 +17,23 @@ import (
 // Each worker is scoped to a region — scaling to multi-region means deploying more workers
 // with different region tags. No code changes needed.
 type Worker struct {
-	region    string
-	monitors  outbound.MonitorRepository
-	checks    outbound.CheckRepository
-	incidents outbound.IncidentRepository
-	channels  outbound.AlertChannelRepository
-	checkers  map[domain.MonitorType]outbound.Checker
-	notifiers map[domain.AlertChannelType]outbound.Notifier
-	cfg       *config.Config
-	concLimit int
+	region       string
+	monitors     outbound.MonitorRepository
+	checks       outbound.CheckRepository
+	outageEvents outbound.OutageEventRepository
+	incidents    outbound.IncidentRepository
+	channels     outbound.AlertChannelRepository
+	checkers     map[domain.MonitorType]outbound.Checker
+	notifiers    map[domain.AlertChannelType]outbound.Notifier
+	cfg          *config.Config
+	concLimit    int
 }
 
 func NewWorker(
 	region string,
 	monitors outbound.MonitorRepository,
 	checks outbound.CheckRepository,
+	outageEvents outbound.OutageEventRepository,
 	incidents outbound.IncidentRepository,
 	channels outbound.AlertChannelRepository,
 	checkers []outbound.Checker,
@@ -48,15 +50,16 @@ func NewWorker(
 		notifierMap[n.Type()] = n
 	}
 	return &Worker{
-		region:    region,
-		monitors:  monitors,
-		checks:    checks,
-		incidents: incidents,
-		channels:  channels,
-		checkers:  checkerMap,
-		notifiers: notifierMap,
-		cfg:       cfg,
-		concLimit: concLimit,
+		region:       region,
+		monitors:     monitors,
+		checks:       checks,
+		outageEvents: outageEvents,
+		incidents:    incidents,
+		channels:     channels,
+		checkers:     checkerMap,
+		notifiers:    notifierMap,
+		cfg:          cfg,
+		concLimit:    concLimit,
 	}
 }
 
@@ -172,44 +175,102 @@ func (w *Worker) checkMonitor(ctx context.Context, monitor domain.Monitor) {
 
 func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, previousStatus domain.MonitorStatus, isUp bool, now time.Time) {
 	if !isUp && previousStatus != domain.MonitorStatusDown {
-		incident := &domain.Incident{
+		// Create internal outage event (uptime math + alert triggering).
+		outageEvent := &domain.OutageEvent{
 			ID:        uuid.New(),
 			MonitorID: monitor.ID,
 			StartedAt: now,
 		}
-		if err := w.incidents.Create(ctx, incident); err != nil {
-			slog.Error("create incident failed", "region", w.region, "monitor_id", monitor.ID, "error", err)
+		if err := w.outageEvents.Create(ctx, outageEvent); err != nil {
+			slog.Error("create outage event failed", "region", w.region, "monitor_id", monitor.ID, "error", err)
 			return
 		}
-		slog.Warn("monitor DOWN — incident opened",
+
+		// Auto-create a user-facing incident so the status page immediately shows context.
+		w.autoCreateIncident(ctx, monitor, now)
+
+		slog.Warn("monitor DOWN — outage event opened",
 			"region", w.region,
 			"monitor_id", monitor.ID,
 			"monitor_name", monitor.Name,
 			"url", monitor.URL,
-			"incident_id", incident.ID,
 		)
-		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, Incident: *incident, Type: domain.AlertEventDown})
+		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, OutageEvent: *outageEvent, Type: domain.AlertEventDown})
 		return
 	}
 
 	if isUp && previousStatus == domain.MonitorStatusDown {
-		incident, err := w.incidents.GetOpenByMonitorID(ctx, monitor.ID)
+		outageEvent, err := w.outageEvents.GetOpenByMonitorID(ctx, monitor.ID)
 		if err != nil {
 			return
 		}
-		if err := w.incidents.Resolve(ctx, incident.ID, now); err != nil {
-			slog.Error("resolve incident failed", "region", w.region, "monitor_id", monitor.ID, "error", err)
+		if err := w.outageEvents.Resolve(ctx, outageEvent.ID, now); err != nil {
+			slog.Error("resolve outage event failed", "region", w.region, "monitor_id", monitor.ID, "error", err)
 			return
 		}
-		incident.ResolvedAt = &now
-		slog.Info("monitor RECOVERED — incident resolved",
+		outageEvent.ResolvedAt = &now
+
+		// Auto-resolve the user-facing incident if one is open for this monitor.
+		w.autoResolveIncident(ctx, monitor, now)
+
+		slog.Info("monitor RECOVERED — outage event resolved",
 			"region", w.region,
 			"monitor_id", monitor.ID,
 			"monitor_name", monitor.Name,
 			"url", monitor.URL,
-			"incident_id", incident.ID,
 		)
-		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, Incident: *incident, Type: domain.AlertEventRecovery})
+		w.sendAlerts(ctx, domain.AlertEvent{Monitor: monitor, OutageEvent: *outageEvent, Type: domain.AlertEventRecovery})
+	}
+}
+
+func (w *Worker) autoCreateIncident(ctx context.Context, monitor domain.Monitor, now time.Time) {
+	inc := &domain.Incident{
+		ID:         uuid.New(),
+		UserID:     monitor.UserID,
+		Name:       monitor.Name + " outage",
+		Status:     domain.IncidentStatusInvestigating,
+		Source:     "auto",
+		MonitorIDs: []uuid.UUID{monitor.ID},
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := w.incidents.Create(ctx, inc); err != nil {
+		slog.Error("auto-create incident failed", "monitor_id", monitor.ID, "error", err)
+		return
+	}
+
+	update := &domain.IncidentUpdate{
+		ID:         uuid.New(),
+		IncidentID: inc.ID,
+		Status:     domain.IncidentStatusInvestigating,
+		Message:    "We are investigating connectivity issues with " + monitor.Name + ".",
+		Notify:     false,
+		CreatedAt:  now,
+	}
+	if err := w.incidents.AddUpdate(ctx, update); err != nil {
+		slog.Error("auto-create incident update failed", "incident_id", inc.ID, "error", err)
+	}
+}
+
+func (w *Worker) autoResolveIncident(ctx context.Context, monitor domain.Monitor, now time.Time) {
+	inc, err := w.incidents.GetOpenByMonitorID(ctx, monitor.ID)
+	if err != nil {
+		return // no open incident, nothing to do
+	}
+
+	update := &domain.IncidentUpdate{
+		ID:         uuid.New(),
+		IncidentID: inc.ID,
+		Status:     domain.IncidentStatusResolved,
+		Message:    monitor.Name + " has recovered and is operating normally.",
+		Notify:     false,
+		CreatedAt:  now,
+	}
+	if err := w.incidents.AddUpdate(ctx, update); err != nil {
+		slog.Error("auto-resolve incident update failed", "incident_id", inc.ID, "error", err)
+	}
+	if err := w.incidents.Resolve(ctx, inc.ID); err != nil {
+		slog.Error("auto-resolve incident failed", "incident_id", inc.ID, "error", err)
 	}
 }
 

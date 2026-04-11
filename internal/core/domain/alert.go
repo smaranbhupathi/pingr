@@ -44,7 +44,7 @@ const (
 )
 
 type AlertEvent struct {
-	Monitor  Monitor
-	Incident Incident
-	Type     AlertEventType
+	Monitor     Monitor
+	OutageEvent OutageEvent
+	Type        AlertEventType
 }
