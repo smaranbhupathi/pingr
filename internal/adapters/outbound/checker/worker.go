@@ -186,8 +186,8 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 			return
 		}
 
-		// Auto-create a user-facing incident so the status page immediately shows context.
-		w.autoCreateIncident(ctx, monitor, now)
+		// Auto-create a user-facing incident linked to this outage event.
+		w.autoCreateIncident(ctx, monitor, outageEvent.ID, now)
 
 		slog.Warn("monitor DOWN — outage event opened",
 			"region", w.region,
@@ -210,8 +210,8 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 		}
 		outageEvent.ResolvedAt = &now
 
-		// Auto-resolve the user-facing incident if one is open for this monitor.
-		w.autoResolveIncident(ctx, monitor, now)
+		// Auto-resolve the user-facing incident that belongs to this outage event.
+		w.autoResolveIncident(ctx, outageEvent.ID, monitor.Name, now)
 
 		slog.Info("monitor RECOVERED — outage event resolved",
 			"region", w.region,
@@ -223,16 +223,17 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 	}
 }
 
-func (w *Worker) autoCreateIncident(ctx context.Context, monitor domain.Monitor, now time.Time) {
+func (w *Worker) autoCreateIncident(ctx context.Context, monitor domain.Monitor, outageEventID uuid.UUID, now time.Time) {
 	inc := &domain.Incident{
-		ID:         uuid.New(),
-		UserID:     monitor.UserID,
-		Name:       monitor.Name + " outage",
-		Status:     domain.IncidentStatusInvestigating,
-		Source:     "auto",
-		MonitorIDs: []uuid.UUID{monitor.ID},
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:            uuid.New(),
+		UserID:        monitor.UserID,
+		Name:          monitor.Name + " outage",
+		Status:        domain.IncidentStatusInvestigating,
+		Source:        "auto",
+		OutageEventID: &outageEventID,
+		MonitorIDs:    []uuid.UUID{monitor.ID},
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := w.incidents.Create(ctx, inc); err != nil {
 		slog.Error("auto-create incident failed", "monitor_id", monitor.ID, "error", err)
@@ -252,17 +253,24 @@ func (w *Worker) autoCreateIncident(ctx context.Context, monitor domain.Monitor,
 	}
 }
 
-func (w *Worker) autoResolveIncident(ctx context.Context, monitor domain.Monitor, now time.Time) {
-	inc, err := w.incidents.GetOpenByMonitorID(ctx, monitor.ID)
+func (w *Worker) autoResolveIncident(ctx context.Context, outageEventID uuid.UUID, monitorName string, now time.Time) {
+	// Look up by outage_event_id — not by monitor_id.
+	// This ensures we only touch the exact incident this outage spawned,
+	// leaving any other open manual incidents for the same monitor untouched.
+	inc, err := w.incidents.GetByOutageEventID(ctx, outageEventID)
 	if err != nil {
-		return // no open incident, nothing to do
+		return // no incident was created for this outage event, nothing to do
+	}
+	if inc.ResolvedAt != nil {
+		// Operator already resolved it manually — respect that, don't overwrite.
+		return
 	}
 
 	update := &domain.IncidentUpdate{
 		ID:         uuid.New(),
 		IncidentID: inc.ID,
 		Status:     domain.IncidentStatusResolved,
-		Message:    monitor.Name + " has recovered and is operating normally.",
+		Message:    monitorName + " has recovered and is operating normally.",
 		Notify:     false,
 		CreatedAt:  now,
 	}

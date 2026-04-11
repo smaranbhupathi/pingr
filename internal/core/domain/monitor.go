@@ -74,16 +74,17 @@ const (
 // Incident is a user-facing communication object shown on the public status page.
 // It can be created manually by the operator or auto-seeded by the worker.
 type Incident struct {
-	ID         uuid.UUID      `json:"id"`
-	UserID     uuid.UUID      `json:"user_id"`
-	Name       string         `json:"name"`
-	Status     IncidentStatus `json:"status"`
-	Source     string         `json:"source"` // "manual" | "auto"
-	ResolvedAt *time.Time     `json:"resolved_at"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	Updates    []IncidentUpdate `json:"updates,omitempty"`
-	MonitorIDs []uuid.UUID    `json:"monitor_ids,omitempty"`
+	ID             uuid.UUID        `json:"id"`
+	UserID         uuid.UUID        `json:"user_id"`
+	Name           string           `json:"name"`
+	Status         IncidentStatus   `json:"status"`
+	Source         string           `json:"source"` // "manual" | "auto"
+	OutageEventID  *uuid.UUID       `json:"outage_event_id,omitempty"` // set for auto-created incidents
+	ResolvedAt     *time.Time       `json:"resolved_at"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+	Updates        []IncidentUpdate `json:"updates,omitempty"`
+	MonitorIDs     []uuid.UUID      `json:"monitor_ids,omitempty"`
 }
 
 // IncidentUpdate is one entry in the incident timeline.

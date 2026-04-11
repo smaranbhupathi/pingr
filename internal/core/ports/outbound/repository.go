@@ -58,6 +58,7 @@ type IncidentRepository interface {
 	AddUpdate(ctx context.Context, update *domain.IncidentUpdate) error
 	GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]domain.IncidentUpdate, error)
 	GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error)
+	GetByOutageEventID(ctx context.Context, outageEventID uuid.UUID) (*domain.Incident, error)
 	Resolve(ctx context.Context, incidentID uuid.UUID) error
 }
 

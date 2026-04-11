@@ -248,9 +248,9 @@ func (r *incidentRepo) Create(ctx context.Context, inc *domain.Incident) error {
 	defer tx.Rollback(ctx)
 
 	_, err = tx.Exec(ctx,
-		`INSERT INTO incidents (id, user_id, name, status, source, resolved_at, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		inc.ID, inc.UserID, inc.Name, inc.Status, inc.Source, inc.ResolvedAt, inc.CreatedAt, inc.UpdatedAt,
+		`INSERT INTO incidents (id, user_id, name, status, source, outage_event_id, resolved_at, created_at, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		inc.ID, inc.UserID, inc.Name, inc.Status, inc.Source, inc.OutageEventID, inc.ResolvedAt, inc.CreatedAt, inc.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -271,7 +271,7 @@ func (r *incidentRepo) Create(ctx context.Context, inc *domain.Incident) error {
 
 func (r *incidentRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error) {
 	inc, err := r.scanOne(r.db.QueryRow(ctx,
-		`SELECT id, user_id, name, status, source, resolved_at, created_at, updated_at
+		`SELECT id, user_id, name, status, source, outage_event_id, resolved_at, created_at, updated_at
 		 FROM incidents WHERE id=$1 AND user_id=$2`, id, userID,
 	))
 	if err != nil {
@@ -285,7 +285,7 @@ func (r *incidentRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*doma
 
 func (r *incidentRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, name, status, source, resolved_at, created_at, updated_at
+		`SELECT id, user_id, name, status, source, outage_event_id, resolved_at, created_at, updated_at
 		 FROM incidents WHERE user_id=$1 ORDER BY created_at DESC`, userID,
 	)
 	if err != nil {
@@ -308,6 +308,13 @@ func (r *incidentRepo) ListByMonitor(ctx context.Context, monitorID uuid.UUID) (
 	}
 	defer rows.Close()
 	return r.scanMany(ctx, rows)
+}
+
+func (r *incidentRepo) GetByOutageEventID(ctx context.Context, outageEventID uuid.UUID) (*domain.Incident, error) {
+	return r.scanOne(r.db.QueryRow(ctx,
+		`SELECT id, user_id, name, status, source, outage_event_id, resolved_at, created_at, updated_at
+		 FROM incidents WHERE outage_event_id=$1`, outageEventID,
+	))
 }
 
 func (r *incidentRepo) GetOpenByMonitorID(ctx context.Context, monitorID uuid.UUID) (*domain.Incident, error) {
@@ -376,7 +383,7 @@ func (r *incidentRepo) scanOne(row interface {
 	Scan(...any) error
 }) (*domain.Incident, error) {
 	var inc domain.Incident
-	if err := row.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
+	if err := row.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.OutageEventID, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &inc, nil
@@ -390,7 +397,7 @@ func (r *incidentRepo) scanMany(ctx context.Context, rows interface {
 	incidents := make([]domain.Incident, 0)
 	for rows.Next() {
 		var inc domain.Incident
-		if err := rows.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
+		if err := rows.Scan(&inc.ID, &inc.UserID, &inc.Name, &inc.Status, &inc.Source, &inc.OutageEventID, &inc.ResolvedAt, &inc.CreatedAt, &inc.UpdatedAt); err != nil {
 			return nil, err
 		}
 		incidents = append(incidents, inc)
