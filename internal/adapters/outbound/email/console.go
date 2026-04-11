@@ -71,3 +71,14 @@ func (n *consoleNotifier) Send(ctx context.Context, event domain.AlertEvent, con
 	)
 	return nil
 }
+
+func (n *consoleNotifier) SendIncidentUpdate(_ context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
+	to, _ := config["email"].(string)
+	slog.Info("📢 INCIDENT UPDATE",
+		"incident", incident.Name,
+		"status", update.Status,
+		"message", update.Message,
+		"to", to,
+	)
+	return nil
+}

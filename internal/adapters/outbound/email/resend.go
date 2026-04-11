@@ -197,6 +197,98 @@ func (n *emailNotifier) Send(ctx context.Context, event domain.AlertEvent, confi
 	return sendViaResend(ctx, n.httpClient, n.apiKey, n.fromEmail, toEmail, subject, html)
 }
 
+func (n *emailNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
+	toEmail, ok := config["email"].(string)
+	if !ok || toEmail == "" {
+		return fmt.Errorf("email notifier: missing email in config")
+	}
+
+	statusLabel := incidentStatusLabel(update.Status)
+	statusColor := incidentHexColor(update.Status)
+	monitorNames := incidentMonitorNamesHTML(incident)
+
+	subject := fmt.Sprintf("[%s] %s", statusLabel, incident.Name)
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html><body style="font-family:sans-serif;background:#f9fafb;margin:0;padding:40px 0;">
+<div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;padding:40px;border:1px solid #e5e7eb;">
+  <h1 style="color:#4f46e5;font-size:22px;margin:0 0 4px;">Pingr</h1>
+  <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Incident Update</p>
+
+  <div style="display:flex;align-items:center;gap:10px;margin:0 0 20px;">
+    <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:%s;color:white;">%s</span>
+    <h2 style="font-size:18px;color:#111827;margin:0;">%s</h2>
+  </div>
+
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:0 0 20px;">
+    <p style="margin:0;color:#374151;font-size:14px;line-height:1.7;">%s</p>
+  </div>
+
+  <table style="width:100%%;border-collapse:collapse;font-size:13px;color:#6b7280;">
+    <tr>
+      <td style="padding:6px 0;font-weight:600;color:#374151;width:120px;">Affected</td>
+      <td style="padding:6px 0;">%s</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;font-weight:600;color:#374151;">Updated at</td>
+      <td style="padding:6px 0;">%s UTC</td>
+    </tr>
+  </table>
+</div>
+</body></html>`,
+		statusColor, statusLabel,
+		incident.Name,
+		update.Message,
+		monitorNames,
+		update.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
+	)
+
+	return sendViaResend(ctx, n.httpClient, n.apiKey, n.fromEmail, toEmail, subject, html)
+}
+
+func incidentStatusLabel(s domain.IncidentStatus) string {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "Investigating"
+	case domain.IncidentStatusIdentified:
+		return "Identified"
+	case domain.IncidentStatusMonitoring:
+		return "Monitoring"
+	case domain.IncidentStatusResolved:
+		return "Resolved"
+	default:
+		return string(s)
+	}
+}
+
+func incidentHexColor(s domain.IncidentStatus) string {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "#dc2626"
+	case domain.IncidentStatusIdentified:
+		return "#f97316"
+	case domain.IncidentStatusMonitoring:
+		return "#eab308"
+	case domain.IncidentStatusResolved:
+		return "#16a34a"
+	default:
+		return "#6b7280"
+	}
+}
+
+func incidentMonitorNamesHTML(incident domain.Incident) string {
+	if len(incident.Monitors) == 0 {
+		return "—"
+	}
+	result := ""
+	for i, m := range incident.Monitors {
+		if i > 0 {
+			result += ", "
+		}
+		result += m.Name
+	}
+	return result
+}
+
 func sendViaResend(ctx context.Context, client *http.Client, apiKey, from, to, subject, html string) error {
 	payload := resendPayload{From: from, To: []string{to}, Subject: subject, HTML: html}
 	body, err := json.Marshal(payload)

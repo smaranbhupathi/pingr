@@ -121,6 +121,124 @@ func (n *discordNotifier) Send(ctx context.Context, event domain.AlertEvent, con
 	return post(ctx, n.client, webhookURL, payload)
 }
 
+func (n *slackNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
+	webhookURL, ok := config["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return fmt.Errorf("slack notifier: missing webhook_url in config")
+	}
+
+	emoji := incidentEmoji(update.Status)
+	monitorNames := incidentMonitorNames(incident)
+
+	text := fmt.Sprintf("%s *[%s] %s*\n\n%s\n\n*Affected:* %s\n*Updated:* %s UTC",
+		emoji,
+		incidentStatusLabel(update.Status),
+		incident.Name,
+		update.Message,
+		monitorNames,
+		update.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
+	)
+	return post(ctx, n.client, webhookURL, map[string]string{"text": text})
+}
+
+func (n *discordNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
+	webhookURL, ok := config["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return fmt.Errorf("discord notifier: missing webhook_url in config")
+	}
+
+	type field struct {
+		Name   string `json:"name"`
+		Value  string `json:"value"`
+		Inline bool   `json:"inline"`
+	}
+	type embed struct {
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		Color       int     `json:"color"`
+		Fields      []field `json:"fields"`
+	}
+
+	payload := map[string]any{
+		"embeds": []embed{{
+			Title:       fmt.Sprintf("%s Incident Update: %s", incidentEmoji(update.Status), incident.Name),
+			Description: update.Message,
+			Color:       incidentColor(update.Status),
+			Fields: []field{
+				{Name: "Status", Value: incidentStatusLabel(update.Status), Inline: true},
+				{Name: "Affected", Value: incidentMonitorNames(incident), Inline: true},
+				{Name: "Updated", Value: update.CreatedAt.UTC().Format("2006-01-02 15:04:05") + " UTC", Inline: false},
+			},
+		}},
+	}
+	return post(ctx, n.client, webhookURL, payload)
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func incidentStatusLabel(s domain.IncidentStatus) string {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "Investigating"
+	case domain.IncidentStatusIdentified:
+		return "Identified"
+	case domain.IncidentStatusMonitoring:
+		return "Monitoring"
+	case domain.IncidentStatusResolved:
+		return "Resolved"
+	default:
+		return string(s)
+	}
+}
+
+func incidentEmoji(s domain.IncidentStatus) string {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "🔴"
+	case domain.IncidentStatusIdentified:
+		return "🟠"
+	case domain.IncidentStatusMonitoring:
+		return "🟡"
+	case domain.IncidentStatusResolved:
+		return "🟢"
+	default:
+		return "⚪"
+	}
+}
+
+func incidentColor(s domain.IncidentStatus) int {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return 0xdc2626 // red
+	case domain.IncidentStatusIdentified:
+		return 0xf97316 // orange
+	case domain.IncidentStatusMonitoring:
+		return 0xeab308 // yellow
+	case domain.IncidentStatusResolved:
+		return 0x16a34a // green
+	default:
+		return 0x6b7280
+	}
+}
+
+func incidentMonitorNames(incident domain.Incident) string {
+	if len(incident.Monitors) == 0 {
+		return "—"
+	}
+	names := make([]string, 0, len(incident.Monitors))
+	for _, m := range incident.Monitors {
+		names = append(names, m.Name)
+	}
+	result := ""
+	for i, n := range names {
+		if i > 0 {
+			result += ", "
+		}
+		result += n
+	}
+	return result
+}
+
 // ── shared ────────────────────────────────────────────────────────────────────
 
 func post(ctx context.Context, client *http.Client, url string, payload any) error {

@@ -352,5 +352,44 @@ func (s *userService) PostIncidentUpdate(ctx context.Context, input inbound.Post
 		return nil, fmt.Errorf("update incident status: %w", err)
 	}
 
-	return s.incidents.GetByID(ctx, inc.ID, input.UserID)
+	// Fetch the full updated incident (with monitors populated) before notifying.
+	updated, err := s.incidents.GetByID(ctx, inc.ID, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Notify {
+		s.fanoutIncidentUpdate(ctx, *updated, *update)
+	}
+
+	return updated, nil
+}
+
+// fanoutIncidentUpdate sends the incident update to every alert channel subscribed
+// to any monitor affected by this incident. Channels are deduplicated — if the same
+// Slack webhook is subscribed to two affected monitors, it only gets one message.
+func (s *userService) fanoutIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate) {
+	seen := make(map[uuid.UUID]bool)
+
+	for _, monitorID := range incident.MonitorIDs {
+		channels, err := s.alertChannels.GetByMonitorID(ctx, monitorID)
+		if err != nil {
+			continue
+		}
+		for _, ch := range channels {
+			if seen[ch.ID] || !ch.IsEnabled {
+				continue
+			}
+			seen[ch.ID] = true
+
+			notifier, ok := s.notifiers[ch.Type]
+			if !ok {
+				continue
+			}
+			if err := notifier.SendIncidentUpdate(ctx, incident, update, ch.Config); err != nil {
+				// Log but don't fail — one bad channel shouldn't block the others.
+				_ = err
+			}
+		}
+	}
 }

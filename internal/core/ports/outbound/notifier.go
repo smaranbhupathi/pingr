@@ -21,6 +21,11 @@ type Notifier interface {
 	// to this channel, so the user can verify the webhook is wired up correctly.
 	// Implementations that don't support this (e.g. email — handled separately) return nil.
 	SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error
+
+	// SendIncidentUpdate fans out a notification when the operator posts an update
+	// to an incident with notify=true. Includes incident name, new status, the update
+	// message, affected monitors, and timestamp.
+	SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error
 }
 
 // EmailSender is used for transactional emails (verify, reset password, subscription confirmation).
