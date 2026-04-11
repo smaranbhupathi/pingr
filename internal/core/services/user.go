@@ -301,6 +301,7 @@ func (s *userService) CreateIncident(ctx context.Context, input inbound.CreateIn
 		Status:     input.Status,
 		Message:    input.Message,
 		Notify:     input.Notify,
+		Source:     "manual",
 		CreatedAt:  now,
 	}
 	if err := s.incidents.AddUpdate(ctx, update); err != nil {
@@ -336,6 +337,7 @@ func (s *userService) PostIncidentUpdate(ctx context.Context, input inbound.Post
 		Status:     input.Status,
 		Message:    input.Message,
 		Notify:     input.Notify,
+		Source:     "manual",
 		CreatedAt:  now,
 	}
 	if err := s.incidents.AddUpdate(ctx, update); err != nil {

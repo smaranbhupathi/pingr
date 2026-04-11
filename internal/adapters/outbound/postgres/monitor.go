@@ -297,7 +297,7 @@ func (r *incidentRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]doma
 
 func (r *incidentRepo) ListByMonitor(ctx context.Context, monitorID uuid.UUID) ([]domain.Incident, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT i.id, i.user_id, i.name, i.status, i.source, i.resolved_at, i.created_at, i.updated_at
+		`SELECT i.id, i.user_id, i.name, i.status, i.source, i.outage_event_id, i.resolved_at, i.created_at, i.updated_at
 		 FROM incidents i
 		 JOIN incident_affected_monitors iam ON iam.incident_id = i.id
 		 WHERE iam.monitor_id=$1
@@ -341,16 +341,16 @@ func (r *incidentRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status do
 
 func (r *incidentRepo) AddUpdate(ctx context.Context, u *domain.IncidentUpdate) error {
 	_, err := r.db.Exec(ctx,
-		`INSERT INTO incident_updates (id, incident_id, status, message, notify, created_at)
-		 VALUES ($1,$2,$3,$4,$5,$6)`,
-		u.ID, u.IncidentID, u.Status, u.Message, u.Notify, u.CreatedAt,
+		`INSERT INTO incident_updates (id, incident_id, status, message, notify, source, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		u.ID, u.IncidentID, u.Status, u.Message, u.Notify, u.Source, u.CreatedAt,
 	)
 	return err
 }
 
 func (r *incidentRepo) GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]domain.IncidentUpdate, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, incident_id, status, message, notify, created_at
+		`SELECT id, incident_id, status, message, notify, source, created_at
 		 FROM incident_updates WHERE incident_id=$1 ORDER BY created_at ASC`, incidentID,
 	)
 	if err != nil {
@@ -361,7 +361,7 @@ func (r *incidentRepo) GetUpdates(ctx context.Context, incidentID uuid.UUID) ([]
 	updates := make([]domain.IncidentUpdate, 0)
 	for rows.Next() {
 		var u domain.IncidentUpdate
-		if err := rows.Scan(&u.ID, &u.IncidentID, &u.Status, &u.Message, &u.Notify, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.IncidentID, &u.Status, &u.Message, &u.Notify, &u.Source, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		updates = append(updates, u)
@@ -422,18 +422,22 @@ func (r *incidentRepo) attachDetails(ctx context.Context, inc *domain.Incident) 
 	inc.Updates = updates
 
 	rows, err := r.db.Query(ctx,
-		`SELECT monitor_id FROM incident_affected_monitors WHERE incident_id=$1`, inc.ID,
+		`SELECT m.id, m.name, m.url
+		 FROM incident_affected_monitors iam
+		 JOIN monitors m ON m.id = iam.monitor_id
+		 WHERE iam.incident_id=$1`, inc.ID,
 	)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var mID uuid.UUID
-		if err := rows.Scan(&mID); err != nil {
+		var m domain.IncidentMonitor
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL); err != nil {
 			return err
 		}
-		inc.MonitorIDs = append(inc.MonitorIDs, mID)
+		inc.MonitorIDs = append(inc.MonitorIDs, m.ID)
+		inc.Monitors = append(inc.Monitors, m)
 	}
 	return rows.Err()
 }

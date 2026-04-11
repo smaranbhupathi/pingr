@@ -58,7 +58,7 @@ export function MonitorDetailPage() {
     )
   }
 
-  const { monitor, uptime, incidents, active_incident } = detail as typeof detail & { active_incident?: Incident }
+  const { monitor, uptime, incidents, active_incident } = detail
 
   const chartData = graph.map(p => ({
     time: format.time(p.timestamp),
@@ -184,7 +184,7 @@ export function MonitorDetailPage() {
             <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No incidents — looking good!</p>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {(incidents as Incident[]).map(inc => {
+              {incidents.map(inc => {
                 const latestUpdate = inc.updates?.[inc.updates.length - 1]
                 return (
                   <Link key={inc.id} to={`/dashboard/incidents/${inc.id}`} className="flex items-start justify-between gap-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-2 px-2 rounded-lg transition-colors">

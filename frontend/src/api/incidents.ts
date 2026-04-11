@@ -8,7 +8,14 @@ export interface IncidentUpdate {
   status: IncidentStatus
   message: string
   notify: boolean
+  source: 'manual' | 'auto'
   created_at: string
+}
+
+export interface IncidentMonitor {
+  id: string
+  name: string
+  url: string
 }
 
 export interface Incident {
@@ -22,6 +29,7 @@ export interface Incident {
   updated_at: string
   updates: IncidentUpdate[]
   monitor_ids: string[]
+  monitors: IncidentMonitor[]
 }
 
 export const incidentsApi = {

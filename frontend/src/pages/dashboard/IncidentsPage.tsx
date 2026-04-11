@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronRight, AlertTriangle, CheckCircle, Search, Clock } from 'lucide-react'
+import { Plus, ChevronRight, AlertTriangle, CheckCircle, Bot } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -109,14 +109,23 @@ function IncidentRow({ incident }: { incident: Incident }) {
                   {latestUpdate.message}
                 </p>
               )}
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {incident.source === 'auto' && (
-                  <span className="mr-2 italic">Auto-detected ·</span>
+                  <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                    <Bot size={9} /> Auto-detected
+                  </span>
                 )}
-                {incident.resolved_at
-                  ? `Resolved ${format.timeAgo(incident.resolved_at)}`
-                  : `Started ${format.timeAgo(incident.created_at)}`}
-              </p>
+                {incident.monitors && incident.monitors.length > 0 && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {incident.monitors.map(m => m.name).join(', ')}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {incident.resolved_at
+                    ? `Resolved ${format.timeAgo(incident.resolved_at)}`
+                    : `Started ${format.timeAgo(incident.created_at)}`}
+                </span>
+              </div>
             </div>
           </div>
           <ChevronRight size={16} className="text-gray-400 shrink-0 mt-0.5" />

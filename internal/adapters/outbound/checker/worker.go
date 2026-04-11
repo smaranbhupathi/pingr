@@ -246,6 +246,7 @@ func (w *Worker) autoCreateIncident(ctx context.Context, monitor domain.Monitor,
 		Status:     domain.IncidentStatusInvestigating,
 		Message:    "We are investigating connectivity issues with " + monitor.Name + ".",
 		Notify:     false,
+		Source:     "auto",
 		CreatedAt:  now,
 	}
 	if err := w.incidents.AddUpdate(ctx, update); err != nil {
@@ -272,6 +273,7 @@ func (w *Worker) autoResolveIncident(ctx context.Context, outageEventID uuid.UUI
 		Status:     domain.IncidentStatusResolved,
 		Message:    monitorName + " has recovered and is operating normally.",
 		Notify:     false,
+		Source:     "auto",
 		CreatedAt:  now,
 	}
 	if err := w.incidents.AddUpdate(ctx, update); err != nil {

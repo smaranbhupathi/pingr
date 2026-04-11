@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Clock, Bot } from 'lucide-react'
+import { ArrowLeft, Clock, Bot, Activity } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -100,6 +100,31 @@ export function IncidentDetailPage() {
           </p>
         </div>
 
+        {/* Affected monitors */}
+        {incident.monitors && incident.monitors.length > 0 && (
+          <Card className="p-5 mb-6">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <Activity size={14} className="text-indigo-500" />
+              Affected components
+            </h2>
+            <div className="space-y-2">
+              {incident.monitors.map(m => (
+                <Link
+                  key={m.id}
+                  to={`/dashboard/monitors/${m.id}`}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{m.name}</span>
+                  </div>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 truncate ml-3">{m.url}</span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Post update form — only for active incidents */}
         {!isResolved && (
           <Card className="p-5 mb-6">
@@ -165,10 +190,17 @@ export function IncidentDetailPage() {
                   <div key={update.id} className="flex gap-4 relative">
                     <span className={`w-3.5 h-3.5 rounded-full border-2 border-white dark:border-gray-900 shrink-0 mt-0.5 ${STATUS_DOT[update.status]}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${STATUS_COLOR[update.status]}`}>
                           {STATUS_LABEL[update.status]}
                         </span>
+                        {update.source === 'auto' ? (
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                            <Bot size={10} /> Auto
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Manual</span>
+                        )}
                         <span className="text-xs text-gray-400 dark:text-gray-500">
                           {format.datetime(update.created_at)}
                         </span>

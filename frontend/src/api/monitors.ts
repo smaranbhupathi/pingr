@@ -1,4 +1,5 @@
 import { client } from './client'
+import type { Incident } from './incidents'
 
 export interface Monitor {
   id: string
@@ -24,12 +25,7 @@ export interface MonitorCheck {
   region: string
 }
 
-export interface Incident {
-  id: string
-  monitor_id: string
-  started_at: string
-  resolved_at: string | null
-}
+export type { Incident }
 
 export interface UptimeStats {
   last_24h: number
@@ -43,6 +39,7 @@ export interface MonitorDetail {
   uptime: UptimeStats
   recent_check: MonitorCheck | null
   incidents: Incident[]
+  active_incident: Incident | null
 }
 
 export interface CheckDataPoint {

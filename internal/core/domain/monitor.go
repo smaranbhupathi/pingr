@@ -83,8 +83,16 @@ type Incident struct {
 	ResolvedAt     *time.Time       `json:"resolved_at"`
 	CreatedAt      time.Time        `json:"created_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`
-	Updates        []IncidentUpdate `json:"updates,omitempty"`
-	MonitorIDs     []uuid.UUID      `json:"monitor_ids,omitempty"`
+	Updates    []IncidentUpdate  `json:"updates,omitempty"`
+	MonitorIDs []uuid.UUID       `json:"monitor_ids,omitempty"`
+	Monitors   []IncidentMonitor `json:"monitors,omitempty"`
+}
+
+// IncidentMonitor is a lightweight summary of a monitor attached to an incident.
+type IncidentMonitor struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	URL  string    `json:"url"`
 }
 
 // IncidentUpdate is one entry in the incident timeline.
@@ -94,5 +102,6 @@ type IncidentUpdate struct {
 	Status     IncidentStatus `json:"status"`
 	Message    string         `json:"message"`
 	Notify     bool           `json:"notify"`
+	Source     string         `json:"source"` // "manual" | "auto"
 	CreatedAt  time.Time      `json:"created_at"`
 }
