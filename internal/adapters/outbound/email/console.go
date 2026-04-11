@@ -55,6 +55,12 @@ func (n *consoleNotifier) Type() domain.AlertChannelType {
 	return domain.AlertChannelEmail
 }
 
+func (n *consoleNotifier) SendSubscriptionConfirmation(_ context.Context, monitorName, monitorURL string, _ map[string]any) error {
+	slog.Info("📧 CONSOLE — subscription confirmation (no-op for email notifier)",
+		"monitor", monitorName, "url", monitorURL)
+	return nil
+}
+
 func (n *consoleNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {
 	to, _ := config["email"].(string)
 	slog.Warn("🚨 ALERT fired",

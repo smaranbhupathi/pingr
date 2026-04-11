@@ -18,6 +18,7 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/storage"
+	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/webhook"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
 	"github.com/smaranbhupathi/pingr/internal/logger"
@@ -91,7 +92,11 @@ func main() {
 		AppBaseURL:           mustEnv("APP_BASE_URL"),
 	})
 	monitorSvc := services.NewMonitorService(monitorRepo, checkRepo, incidentRepo, userRepo, planRepo)
-	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender, storageSvc)
+	webhookNotifiers := []outbound.Notifier{
+		webhook.NewSlackNotifier(),
+		webhook.NewDiscordNotifier(),
+	}
+	userSvc    := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, emailSender, storageSvc, webhookNotifiers)
 
 	// HTTP handlers
 	authH    := handler.NewAuthHandler(authSvc, log)

@@ -126,6 +126,12 @@ func (n *emailNotifier) Type() domain.AlertChannelType {
 	return domain.AlertChannelEmail
 }
 
+// SendSubscriptionConfirmation is a no-op for email — the EmailSender already
+// sends a dedicated confirmation email via SendSubscriptionConfirmation.
+func (n *emailNotifier) SendSubscriptionConfirmation(_ context.Context, _, _ string, _ map[string]any) error {
+	return nil
+}
+
 func (n *emailNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {
 	toEmail, ok := config["email"].(string)
 	if !ok || toEmail == "" {

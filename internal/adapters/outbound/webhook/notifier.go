@@ -33,6 +33,17 @@ func (n *slackNotifier) Type() domain.AlertChannelType {
 	return domain.AlertChannelSlack
 }
 
+func (n *slackNotifier) SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error {
+	webhookURL, ok := config["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return fmt.Errorf("slack notifier: missing webhook_url in config")
+	}
+	text := fmt.Sprintf("✅ *%s* is now subscribed to Pingr alerts for *%s* (<%s|%s>)\nYou'll be notified here when the monitor goes down or recovers.",
+		"This channel", monitorName, monitorURL, monitorURL,
+	)
+	return post(ctx, n.client, webhookURL, map[string]string{"text": text})
+}
+
 func (n *slackNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {
 	webhookURL, ok := config["webhook_url"].(string)
 	if !ok || webhookURL == "" {
@@ -71,6 +82,17 @@ func NewDiscordNotifier() outbound.Notifier {
 
 func (n *discordNotifier) Type() domain.AlertChannelType {
 	return domain.AlertChannelDiscord
+}
+
+func (n *discordNotifier) SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error {
+	webhookURL, ok := config["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return fmt.Errorf("discord notifier: missing webhook_url in config")
+	}
+	content := fmt.Sprintf("✅ **%s** is now subscribed to Pingr alerts for **%s** (%s)\nYou'll be notified here when the monitor goes down or recovers.",
+		"This channel", monitorName, monitorURL,
+	)
+	return post(ctx, n.client, webhookURL, map[string]string{"content": content})
 }
 
 func (n *discordNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {

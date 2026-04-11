@@ -16,6 +16,11 @@ type Notifier interface {
 
 	// Send dispatches the alert. Config is the channel-specific config map from AlertChannel.
 	Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error
+
+	// SendSubscriptionConfirmation sends a one-time message when a monitor is subscribed
+	// to this channel, so the user can verify the webhook is wired up correctly.
+	// Implementations that don't support this (e.g. email — handled separately) return nil.
+	SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error
 }
 
 // EmailSender is used for transactional emails (verify, reset password, subscription confirmation).

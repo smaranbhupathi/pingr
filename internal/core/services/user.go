@@ -27,6 +27,7 @@ type userService struct {
 	monitors      outbound.MonitorRepository
 	email         outbound.EmailSender
 	storage       outbound.StorageService // nil when storage is not configured
+	notifiers     map[domain.AlertChannelType]outbound.Notifier
 }
 
 func NewUserService(
@@ -37,7 +38,12 @@ func NewUserService(
 	monitors outbound.MonitorRepository,
 	email outbound.EmailSender,
 	storage outbound.StorageService,
+	notifiers []outbound.Notifier,
 ) inbound.UserService {
+	notifierMap := make(map[domain.AlertChannelType]outbound.Notifier, len(notifiers))
+	for _, n := range notifiers {
+		notifierMap[n.Type()] = n
+	}
 	return &userService{
 		users:         users,
 		plans:         plans,
@@ -46,6 +52,7 @@ func NewUserService(
 		monitors:      monitors,
 		email:         email,
 		storage:       storage,
+		notifiers:     notifierMap,
 	}
 }
 
@@ -198,13 +205,11 @@ func (s *userService) SubscribeMonitorToChannel(ctx context.Context, monitorID, 
 		return ErrAlertChannelNotFound
 	}
 
-	// Find the channel to get the email address for the confirmation
-	var channelEmail string
-	for _, ch := range channels {
-		if ch.ID == channelID {
-			if e, ok := ch.Config["email"].(string); ok {
-				channelEmail = e
-			}
+	// Find the subscribed channel for confirmation message
+	var subscribedChannel *domain.AlertChannel
+	for i := range channels {
+		if channels[i].ID == channelID {
+			subscribedChannel = &channels[i]
 			break
 		}
 	}
@@ -219,9 +224,18 @@ func (s *userService) SubscribeMonitorToChannel(ctx context.Context, monitorID, 
 		return err
 	}
 
-	// Send confirmation email (best-effort — don't fail the subscription if email fails)
-	if channelEmail != "" {
-		_ = s.email.SendSubscriptionConfirmation(ctx, channelEmail, monitor.Name, monitor.URL)
+	// Send confirmation — best-effort, never fail the subscription itself
+	if subscribedChannel != nil {
+		switch subscribedChannel.Type {
+		case domain.AlertChannelEmail:
+			if emailAddr, ok := subscribedChannel.Config["email"].(string); ok && emailAddr != "" {
+				_ = s.email.SendSubscriptionConfirmation(ctx, emailAddr, monitor.Name, monitor.URL)
+			}
+		default:
+			if n, ok := s.notifiers[subscribedChannel.Type]; ok {
+				_ = n.SendSubscriptionConfirmation(ctx, monitor.Name, monitor.URL, subscribedChannel.Config)
+			}
+		}
 	}
 	return nil
 }
