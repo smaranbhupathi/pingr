@@ -29,11 +29,12 @@ type UptimeStats struct {
 }
 
 type MonitorDetail struct {
-	Monitor     domain.Monitor       `json:"monitor"`
-	Uptime      UptimeStats          `json:"uptime"`
-	RecentCheck *domain.MonitorCheck `json:"recent_check"`
-	Incidents   []domain.Incident    `json:"incidents"`
-	ActiveIncident *domain.Incident  `json:"active_incident"`
+	Monitor        domain.Monitor          `json:"monitor"`
+	Uptime         UptimeStats             `json:"uptime"`
+	DailyUptime    []domain.DailyUptimeStat `json:"daily_uptime"`
+	RecentCheck    *domain.MonitorCheck    `json:"recent_check"`
+	Incidents      []domain.Incident       `json:"incidents"`
+	ActiveIncident *domain.Incident        `json:"active_incident"`
 }
 
 type CheckDataPoint struct {

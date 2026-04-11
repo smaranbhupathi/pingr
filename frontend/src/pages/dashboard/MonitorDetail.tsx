@@ -3,29 +3,16 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { monitorsApi } from '../../api/monitors'
 import { userApi } from '../../api/user'
-import { type Incident, type IncidentStatus } from '../../api/incidents'
+import { type Incident } from '../../api/incidents'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { ArrowLeft, Bell, CheckCircle, PauseCircle, PlayCircle, X, AlertTriangle, ChevronRight } from 'lucide-react'
+import { STATUS_LABEL, STATUS_COLOR, STATUS_DOT } from '../../lib/incidents'
 import { format } from '../../lib/format'
 import { usePageTitle } from '../../lib/usePageTitle'
-
-const STATUS_LABEL: Record<IncidentStatus, string> = {
-  investigating: 'Investigating',
-  identified: 'Identified',
-  monitoring: 'Monitoring',
-  resolved: 'Resolved',
-}
-
-const STATUS_COLOR: Record<IncidentStatus, string> = {
-  investigating: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  identified: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  monitoring: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  resolved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-}
 
 export function MonitorDetailPage() {
   usePageTitle('Monitor detail')
@@ -70,22 +57,22 @@ export function MonitorDetailPage() {
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto">
-        <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6">
-          <ArrowLeft size={14} /> Back to dashboard
+        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition-colors">
+          <ArrowLeft size={14} /> Back to monitors
         </Link>
 
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-semibold text-gray-900">{monitor.name}</h1>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{monitor.name}</h1>
               <StatusBadge status={effectiveStatus} />
             </div>
-            <a href={monitor.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-500 hover:underline">
+            <a href={monitor.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-500 dark:text-indigo-400 hover:underline">
               {monitor.url} ↗
             </a>
             {monitor.last_checked_at && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                 Last checked {format.timeAgo(monitor.last_checked_at)}
               </p>
             )}
@@ -144,8 +131,8 @@ export function MonitorDetailPage() {
         </div>
 
         {/* Response time chart */}
-        <Card className="p-6 mb-6">
-          <h2 className="text-sm font-medium text-gray-700 mb-4">Response time (last 24h)</h2>
+        <Card className="p-5 mb-6">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Response time (last 24h)</h2>
           {chartData.length === 0 ? (
             <div className="h-40 flex items-center justify-center text-gray-400 text-sm">
               No data yet — check back after the first monitor run
@@ -170,26 +157,24 @@ export function MonitorDetailPage() {
         </Card>
 
         {/* Incidents */}
-        <Card className="p-6 mb-6">
+        <Card className="p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Incidents</h2>
-            <Link
-              to="/dashboard/incidents"
-              className="text-xs text-indigo-500 hover:underline"
-            >
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Incidents</h2>
+            <Link to="/dashboard/incidents" className="text-xs text-indigo-500 dark:text-indigo-400 hover:underline">
               View all →
             </Link>
           </div>
           {!incidents || incidents.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No incidents — looking good!</p>
           ) : (
-            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {incidents.map(inc => {
                 const latestUpdate = inc.updates?.[inc.updates.length - 1]
                 return (
-                  <Link key={inc.id} to={`/dashboard/incidents/${inc.id}`} className="flex items-start justify-between gap-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-2 px-2 rounded-lg transition-colors">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <span className={`mt-0.5 shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[inc.status]}`}>
+                  <Link key={inc.id} to={`/dashboard/incidents/${inc.id}`} className="flex items-start justify-between gap-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 -mx-1 px-1 rounded-lg transition-colors">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <span className={`mt-0.5 shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[inc.status]}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[inc.status]}`} />
                         {STATUS_LABEL[inc.status]}
                       </span>
                       <div className="min-w-0">
@@ -204,7 +189,7 @@ export function MonitorDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight size={14} className="text-gray-400 shrink-0 mt-1" />
+                    <ChevronRight size={14} className="text-gray-300 dark:text-gray-600 shrink-0 mt-1" />
                   </Link>
                 )
               })}

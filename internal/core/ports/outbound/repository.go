@@ -37,7 +37,8 @@ type MonitorRepository interface {
 type CheckRepository interface {
 	Create(ctx context.Context, check *domain.MonitorCheck) error
 	GetByMonitorID(ctx context.Context, monitorID uuid.UUID, from, to time.Time) ([]domain.MonitorCheck, error)
-	GetUptimeStats(ctx context.Context, monitorID uuid.UUID, from time.Time) (float64, error) // returns uptime %
+	GetUptimeStats(ctx context.Context, monitorID uuid.UUID, from time.Time) (float64, error)
+	GetDailyUptime(ctx context.Context, monitorID uuid.UUID, days int) ([]domain.DailyUptimeStat, error)
 	GetLatest(ctx context.Context, monitorID uuid.UUID) (*domain.MonitorCheck, error)
 }
 

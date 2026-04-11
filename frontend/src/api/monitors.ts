@@ -34,9 +34,15 @@ export interface UptimeStats {
   last_90d: number
 }
 
+export interface DailyUptimeStat {
+  date: string    // "2026-04-11"
+  uptime: number  // 0–100, or -1 = no data
+}
+
 export interface MonitorDetail {
   monitor: Monitor
   uptime: UptimeStats
+  daily_uptime: DailyUptimeStat[]
   recent_check: MonitorCheck | null
   incidents: Incident[]
   active_incident: Incident | null

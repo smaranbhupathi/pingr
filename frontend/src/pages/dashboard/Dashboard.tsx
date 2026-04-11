@@ -48,9 +48,9 @@ export function DashboardPage() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Monitors</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Monitors</h1>
           {monitors.length > 0 && (
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {up} up · {down} down · {monitors.length} total
             </p>
           )}
@@ -62,25 +62,25 @@ export function DashboardPage() {
       {isLoading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading…</div>
       ) : monitors.length === 0 ? (
-        <div className="text-center py-24 border border-dashed border-gray-200 rounded-xl">
-          <Globe className="mx-auto mb-3 text-gray-300" size={36} />
-          <p className="text-sm font-medium text-gray-500">No monitors yet</p>
-          <p className="text-xs text-gray-400 mt-1 mb-4">Add a URL to start tracking uptime</p>
+        <div className="text-center py-24 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+          <Globe className="mx-auto mb-3 text-gray-300 dark:text-gray-600" size={36} />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No monitors yet</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 mb-4">Add a URL to start tracking uptime</p>
           <Button onClick={() => setShowAdd(true)}>Add monitor</Button>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
           {/* Table header */}
-          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Monitor</span>
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</span>
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Interval</span>
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Last checked</span>
+          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Monitor</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Status</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Interval</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Last checked</span>
             <span />
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {monitors.map(m => (
               <MonitorRow
                 key={m.id}
@@ -108,11 +108,11 @@ function MonitorRow({
   onToggle: () => void
 }) {
   return (
-    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group">
+    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
       {/* Name + URL */}
       <Link to={`/dashboard/monitors/${m.id}`} className="min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
-        <p className="text-xs text-gray-400 truncate mt-0.5">{m.url}</p>
+        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{m.name}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{m.url}</p>
       </Link>
 
       {/* Status */}
@@ -121,12 +121,12 @@ function MonitorRow({
       </div>
 
       {/* Interval */}
-      <span className="text-sm text-gray-500">
+      <span className="text-sm text-gray-500 dark:text-gray-400">
         {m.interval_seconds < 60 ? `${m.interval_seconds}s` : `${m.interval_seconds / 60}m`}
       </span>
 
       {/* Last checked */}
-      <span className="text-sm text-gray-400">{timeAgo(m.last_checked_at)}</span>
+      <span className="text-sm text-gray-400 dark:text-gray-500">{timeAgo(m.last_checked_at)}</span>
 
       {/* Actions — visible on hover */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

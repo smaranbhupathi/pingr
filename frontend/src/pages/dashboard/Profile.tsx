@@ -81,14 +81,17 @@ export function ProfilePage() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-xl font-semibold text-gray-900 mb-6">Profile</h1>
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Profile</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Your account details</p>
+        </div>
 
         {isLoading ? (
           <div className="text-sm text-gray-400 py-10 text-center">Loading…</div>
         ) : profile ? (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
             {/* Avatar block */}
-            <div className="px-6 py-6 border-b border-gray-100 flex items-center gap-4">
+            <div className="px-6 py-6 border-b border-gray-100 dark:border-gray-800 flex items-center gap-4">
               {/* Clickable avatar with camera overlay */}
               <button
                 type="button"
@@ -142,7 +145,7 @@ export function ProfilePage() {
             </div>
 
             {/* Info rows */}
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               <ProfileRow icon={<User size={15} />} label="Username" value={profile.username} />
               <ProfileRow icon={<Mail size={15} />} label="Email" value={profile.email} />
               <ProfileRow

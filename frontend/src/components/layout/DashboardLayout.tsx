@@ -29,35 +29,38 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
           {navItems.map(({ to, label, icon: Icon, exact }) => (
             <NavLink
               key={to}
               to={to}
               end={exact}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                 }`
               }
             >
-              <Icon size={16} />
+              <Icon size={15} />
               {label}
             </NavLink>
           ))}
 
           {profile && (
-            <a
-              href={`/status/${profile.username}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              <ExternalLink size={16} />
-              Status Page
-            </a>
+            <>
+              <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+              <a
+                href={`/status/${profile.username}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"
+              >
+                <ExternalLink size={15} />
+                Status Page
+              </a>
+            </>
           )}
         </nav>
       </aside>

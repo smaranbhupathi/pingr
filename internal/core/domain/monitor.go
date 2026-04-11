@@ -52,6 +52,13 @@ type MonitorCheck struct {
 }
 
 // OutageEvent is created automatically by the worker when a monitor goes down.
+// DailyUptimeStat holds the uptime percentage for a single calendar day.
+// Uptime == -1 means no checks ran that day (new monitor or gap in data).
+type DailyUptimeStat struct {
+	Date   string  `json:"date"`   // "2026-04-11"
+	Uptime float64 `json:"uptime"` // 0–100 or -1
+}
+
 // Used purely for uptime math and alert triggering — not directly shown in the UI.
 type OutageEvent struct {
 	ID         uuid.UUID      `json:"id"`

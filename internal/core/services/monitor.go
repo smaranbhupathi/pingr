@@ -190,6 +190,7 @@ func (s *monitorService) buildDetail(ctx context.Context, monitor domain.Monitor
 	u30d, _ := s.checks.GetUptimeStats(ctx, monitor.ID, now.Add(-30*24*time.Hour))
 	u90d, _ := s.checks.GetUptimeStats(ctx, monitor.ID, now.Add(-90*24*time.Hour))
 
+	daily, _ := s.checks.GetDailyUptime(ctx, monitor.ID, 90)
 	latest, _ := s.checks.GetLatest(ctx, monitor.ID)
 	incidents, _ := s.incidents.ListByMonitor(ctx, monitor.ID)
 
@@ -207,6 +208,7 @@ func (s *monitorService) buildDetail(ctx context.Context, monitor domain.Monitor
 			Last30d: u30d,
 			Last90d: u90d,
 		},
+		DailyUptime:    daily,
 		RecentCheck:    latest,
 		Incidents:      incidents,
 		ActiveIncident: activeIncident,

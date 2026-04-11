@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userApi } from '../../api/user'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Card } from '../../components/ui/Card'
 import { Bell, ChevronRight, Trash2 } from 'lucide-react'
 
 type ChannelType = 'email' | 'slack' | 'discord'
@@ -23,16 +22,17 @@ function channelDisplayName(ch: { name: string; type: string; config: Record<str
 }
 
 function channelSubtitle(ch: { name: string; type: string; config: Record<string, string> }) {
-  const typeLabel = CHANNEL_OPTIONS.find(o => o.type === ch.type)?.label ?? ch.type
-  if (ch.type === 'email') return `${typeLabel} · ${ch.config.email || ''}`
+  if (ch.type === 'email') return ch.config.email || ''
   const url = ch.config.webhook_url || ''
-  // Show just the domain part of the webhook URL to keep it short
-  const short = url ? new URL(url).hostname : ''
-  return `${typeLabel}${short ? ` · ${short}` : ''}`
+  try { return new URL(url).hostname } catch { return '' }
 }
 
 function channelIcon(type: string) {
   return CHANNEL_OPTIONS.find(o => o.type === type)?.icon ?? '🔔'
+}
+
+function channelTypeLabel(type: string) {
+  return CHANNEL_OPTIONS.find(o => o.type === type)?.label ?? type
 }
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
@@ -41,7 +41,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
       type="button"
       onClick={e => { e.preventDefault(); e.stopPropagation(); onChange(!enabled) }}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-        enabled ? 'bg-indigo-500' : 'bg-gray-200'
+        enabled ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-600'
       }`}
       title={enabled ? 'Disable channel' : 'Enable channel'}
     >
@@ -67,9 +67,7 @@ export function AlertChannelsSection() {
 
   const createMutation = useMutation({
     mutationFn: () => {
-      const config = type === 'email'
-        ? { email: value }
-        : { webhook_url: value }
+      const config = type === 'email' ? { email: value } : { webhook_url: value }
       return userApi.createAlertChannel(name, type, config, channels.length === 0)
     },
     onSuccess: () => {
@@ -96,26 +94,35 @@ export function AlertChannelsSection() {
   const selected = CHANNEL_OPTIONS.find(o => o.type === type)!
 
   return (
-    <div className="mt-10">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Alert Channels</h2>
-        <Button variant="secondary" onClick={() => { setShowForm(s => !s); setErr('') }}>
+    <div>
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Alert Channels</h1>
+          {channels.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {channels.filter(c => c.is_enabled).length} active · {channels.length} total
+            </p>
+          )}
+        </div>
+        <Button onClick={() => { setShowForm(s => !s); setErr('') }}>
           + Add channel
         </Button>
       </div>
 
+      {/* Add channel form */}
       {showForm && (
-        <Card className="p-4 mb-3">
-          {/* Channel type selector */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-4">
+          {/* Type selector */}
           <div className="flex gap-2 mb-4">
             {CHANNEL_OPTIONS.map(opt => (
               <button
                 key={opt.type}
-                onClick={() => { setType(opt.type); setValue(''); setErr(''); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                onClick={() => { setType(opt.type); setValue(''); setErr('') }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                   type === opt.type
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 <span>{opt.icon}</span> {opt.label}
@@ -123,16 +130,9 @@ export function AlertChannelsSection() {
             ))}
           </div>
 
-          {/* Name + value inputs */}
           <div className="flex gap-3 items-end">
             <div className="w-40 shrink-0">
-              <Input
-                label="Channel name"
-                type="text"
-                placeholder="e.g. Team Slack"
-                value={name}
-                onChange={e => setName(e.target.value)}
-              />
+              <Input label="Channel name" type="text" placeholder="e.g. Team Slack" value={name} onChange={e => setName(e.target.value)} />
             </div>
             <div className="flex-1">
               <Input
@@ -144,77 +144,92 @@ export function AlertChannelsSection() {
               />
             </div>
             <div className="flex gap-2 pb-0.5">
-              <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
-                Save
-              </Button>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setErr('') }}>
-                Cancel
-              </Button>
+              <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>Save</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setErr('') }}>Cancel</Button>
             </div>
           </div>
 
-          {/* Help text */}
           {type === 'slack' && (
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
               Slack → Channel settings → Integrations → Add an App → Incoming Webhooks → Add to Slack → copy URL
             </p>
           )}
           {type === 'discord' && (
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
               Discord → Channel settings → Integrations → Webhooks → New Webhook → Copy Webhook URL
             </p>
           )}
-
           {err && <p className="text-sm text-red-500 mt-2">{err}</p>}
-        </Card>
+        </div>
       )}
 
+      {/* Channels table */}
       {channels.length === 0 && !showForm ? (
-        <Card className="p-8 text-center">
-          <Bell className="mx-auto mb-3 text-gray-300" size={32} />
-          <p className="text-gray-500 text-sm font-medium">No alert channels yet</p>
-          <p className="text-gray-400 text-xs mt-1">
-            Add email, Slack, or Discord to receive alerts when monitors go down or recover
-          </p>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {channels.map(ch => (
-            <Card key={ch.id} className={`p-4 flex items-center justify-between group hover:border-indigo-200 transition-colors ${!ch.is_enabled ? 'opacity-60' : ''}`}>
-              <Link
-                to={`/dashboard/alert-channels/${ch.id}`}
-                className="flex items-center gap-3 flex-1 min-w-0"
-              >
-                <span className="text-lg shrink-0">{channelIcon(ch.type)}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {channelDisplayName(ch)}
-                    {ch.is_default && (
-                      <span className="ml-2 text-xs font-normal text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">Default</span>
+        <div className="text-center py-24 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+          <Bell className="mx-auto mb-3 text-gray-300 dark:text-gray-600" size={36} />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No alert channels yet</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add email, Slack, or Discord to get notified when monitors go down</p>
+        </div>
+      ) : channels.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-[2fr_1fr_auto_auto] gap-4 px-5 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Channel</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Type</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Enabled</span>
+            <span />
+          </div>
+
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {channels.map(ch => (
+              <div key={ch.id} className={`grid grid-cols-[2fr_1fr_auto_auto] gap-4 items-center px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${!ch.is_enabled ? 'opacity-60' : ''}`}>
+                {/* Name */}
+                <Link to={`/dashboard/alert-channels/${ch.id}`} className="flex items-center gap-3 min-w-0">
+                  <span className="text-lg shrink-0">{channelIcon(ch.type)}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {channelDisplayName(ch)}
+                      </p>
+                      {ch.is_default && (
+                        <span className="shrink-0 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    {channelSubtitle(ch) && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{channelSubtitle(ch)}</p>
                     )}
-                    {!ch.is_enabled && (
-                      <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Paused</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate">{channelSubtitle(ch)}</p>
-                </div>
-                <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400 shrink-0 ml-auto mr-2" />
-              </Link>
-              <div className="flex items-center gap-2 shrink-0">
+                  </div>
+                </Link>
+
+                {/* Type */}
+                <span className="text-sm text-gray-500 dark:text-gray-400">{channelTypeLabel(ch.type)}</span>
+
+                {/* Toggle */}
                 <Toggle
                   enabled={ch.is_enabled}
                   onChange={enabled => toggleMutation.mutate({ id: ch.id, enabled })}
                 />
-                <button
-                  onClick={() => deleteMutation.mutate(ch.id)}
-                  className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
-                  title="Delete channel"
-                >
-                  <Trash2 size={16} />
-                </button>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link to={`/dashboard/alert-channels/${ch.id}`}>
+                    <span className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 inline-block">
+                      <ChevronRight size={15} />
+                    </span>
+                  </Link>
+                  <button
+                    onClick={() => deleteMutation.mutate(ch.id)}
+                    className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    title="Delete channel"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
-            </Card>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

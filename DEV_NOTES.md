@@ -144,9 +144,26 @@ STORAGE_BUCKET=avatars
 STORAGE_PUBLIC_BASE_URL=http://localhost:9000/avatars
 ```
 
+### Cloudflare R2 (production avatar storage)
+| Field | Value |
+|---|---|
+| Account ID | `17ae071eb96020b8c73b4c2856e6e375` |
+| Bucket | `pingr-avatars` |
+| Public URL | `https://pub-8426e15f4f3e410f81cd9c6eb17d0554.r2.dev` |
+| Access Key ID | `564eb99e64c89c63652082e84a4d5980` |
+| Secret Access Key | `1d90b810f6d6cc02b50e3aa097ea501ee35f88113d9ca7043ebb75d565a8ec87` |
+| Endpoint | `https://17ae071eb96020b8c73b4c2856e6e375.r2.cloudflarestorage.com` |
+
+---
+
 ### Neon (production database)
-Credentials are in your `.env` file (`DATABASE_URL`).
-If lost: Neon dashboard → your project → Connection Details.
+| Field | Value |
+|---|---|
+| Direct URL | `postgres://neondb_owner:npg_SRczyACe9Mw1@ep-falling-pond-a17nfdoo.ap-southeast-1.aws.neon.tech/neondb?sslmode=require` |
+| Pooler URL | `postgresql://neondb_owner:npg_SRczyACe9Mw1@ep-falling-pond-a17nfdoo-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require` |
+
+Use **pooler URL** for: GitHub Actions migrations, short-lived connections
+Use **direct URL** for: Railway API and Worker (persistent connections)
 
 ---
 

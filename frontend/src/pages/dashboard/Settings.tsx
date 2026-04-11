@@ -10,12 +10,15 @@ export function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-xl mx-auto">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Settings</h1>
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage your account preferences</p>
+        </div>
 
         {/* Appearance */}
-        <Card className="p-6 mb-4">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Appearance</h2>
+        <Card className="p-5 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Appearance</h2>
 
           <div className="flex gap-3">
             <ThemeOption
@@ -37,9 +40,8 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        {/* More settings sections can go here */}
-        <Card className="p-6">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Notifications</h2>
+        <Card className="p-5">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Notifications</h2>
           <p className="text-sm text-gray-400 dark:text-gray-500">
             Manage alert channels and subscriptions in{' '}
             <a href="/dashboard/alert-channels" className="text-indigo-500 hover:underline">Alert Channels</a>.

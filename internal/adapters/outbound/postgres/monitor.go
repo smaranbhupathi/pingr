@@ -184,6 +184,56 @@ func (r *checkRepo) GetUptimeStats(ctx context.Context, monitorID uuid.UUID, fro
 	return float64(up) / float64(total) * 100, nil
 }
 
+func (r *checkRepo) GetDailyUptime(ctx context.Context, monitorID uuid.UUID, days int) ([]domain.DailyUptimeStat, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			(checked_at AT TIME ZONE 'UTC')::date AS day,
+			ROUND(
+				COUNT(*) FILTER (WHERE is_up = true)::numeric /
+				NULLIF(COUNT(*)::numeric, 0) * 100,
+			2) AS uptime_pct
+		FROM monitor_checks
+		WHERE monitor_id = $1
+		  AND checked_at >= NOW() - ($2::int || ' days')::interval
+		GROUP BY day
+		ORDER BY day ASC`, monitorID, days,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Build a map of day → uptime%
+	type row struct {
+		date   string
+		uptime float64
+	}
+	dataByDate := make(map[string]float64)
+	for rows.Next() {
+		var day string
+		var pct float64
+		if err := rows.Scan(&day, &pct); err != nil {
+			return nil, err
+		}
+		dataByDate[day] = pct
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Fill the full window, marking missing days as -1 (no data)
+	result := make([]domain.DailyUptimeStat, days)
+	for i := 0; i < days; i++ {
+		d := time.Now().UTC().AddDate(0, 0, -(days-1-i)).Format("2006-01-02")
+		uptime, ok := dataByDate[d]
+		if !ok {
+			uptime = -1
+		}
+		result[i] = domain.DailyUptimeStat{Date: d, Uptime: uptime}
+	}
+	return result, nil
+}
+
 func (r *checkRepo) GetLatest(ctx context.Context, monitorID uuid.UUID) (*domain.MonitorCheck, error) {
 	var c domain.MonitorCheck
 	err := r.db.QueryRow(ctx, `
