@@ -6,10 +6,30 @@ import { Input } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
 import { Bell, Trash2 } from 'lucide-react'
 
+type ChannelType = 'email' | 'slack' | 'discord'
+
+const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: string; placeholder: string }[] = [
+  { type: 'email',   label: 'Email',   icon: '✉️',  placeholder: 'alerts@example.com' },
+  { type: 'slack',   label: 'Slack',   icon: '💬',  placeholder: 'https://hooks.slack.com/services/...' },
+  { type: 'discord', label: 'Discord', icon: '🎮',  placeholder: 'https://discord.com/api/webhooks/...' },
+]
+
+function channelLabel(ch: { type: string; config: Record<string, string> }) {
+  if (ch.type === 'email')   return ch.config.email
+  if (ch.type === 'slack')   return 'Slack webhook'
+  if (ch.type === 'discord') return 'Discord webhook'
+  return ch.type
+}
+
+function channelIcon(type: string) {
+  return CHANNEL_OPTIONS.find(o => o.type === type)?.icon ?? '🔔'
+}
+
 export function AlertChannelsSection() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const [email, setEmail] = useState('')
+  const [type, setType] = useState<ChannelType>('email')
+  const [value, setValue] = useState('')
   const [err, setErr] = useState('')
 
   const { data: channels = [] } = useQuery({
@@ -18,20 +38,27 @@ export function AlertChannelsSection() {
   })
 
   const createMutation = useMutation({
-    mutationFn: () => userApi.createAlertChannel('email', { email }, channels.length === 0),
+    mutationFn: () => {
+      const config = type === 'email'
+        ? { email: value }
+        : { webhook_url: value }
+      return userApi.createAlertChannel(type, config, channels.length === 0)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-channels'] })
-      setEmail('')
+      setValue('')
       setShowForm(false)
       setErr('')
     },
-    onError: () => setErr('Failed to create channel'),
+    onError: (e: any) => setErr(e.response?.data?.error ?? 'Failed to create channel'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => userApi.deleteAlertChannel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-channels'] }),
   })
+
+  const selected = CHANNEL_OPTIONS.find(o => o.type === type)!
 
   return (
     <div className="mt-10">
@@ -44,22 +71,36 @@ export function AlertChannelsSection() {
 
       {showForm && (
         <Card className="p-4 mb-3">
-          <p className="text-sm font-medium text-gray-700 mb-3">New email alert channel</p>
+          {/* Channel type selector */}
+          <div className="flex gap-2 mb-4">
+            {CHANNEL_OPTIONS.map(opt => (
+              <button
+                key={opt.type}
+                onClick={() => { setType(opt.type); setValue(''); setErr('') }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                  type === opt.type
+                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <span>{opt.icon}</span> {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <Input
-                label="Email address"
-                type="email"
-                placeholder="alerts@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                label={selected.label}
+                type={type === 'email' ? 'email' : 'url'}
+                placeholder={selected.placeholder}
+                value={value}
+                onChange={e => setValue(e.target.value)}
               />
             </div>
             <div className="flex gap-2 pb-0.5">
-              <Button
-                onClick={() => createMutation.mutate()}
-                loading={createMutation.isPending}
-              >
+              <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
                 Save
               </Button>
               <Button variant="secondary" onClick={() => { setShowForm(false); setErr('') }}>
@@ -67,6 +108,19 @@ export function AlertChannelsSection() {
               </Button>
             </div>
           </div>
+
+          {/* Help text */}
+          {type === 'slack' && (
+            <p className="text-xs text-gray-400 mt-2">
+              Slack → Channel settings → Integrations → Add an App → Incoming Webhooks → Add to Slack → copy URL
+            </p>
+          )}
+          {type === 'discord' && (
+            <p className="text-xs text-gray-400 mt-2">
+              Discord → Channel settings → Integrations → Webhooks → New Webhook → Copy Webhook URL
+            </p>
+          )}
+
           {err && <p className="text-sm text-red-500 mt-2">{err}</p>}
         </Card>
       )}
@@ -76,7 +130,7 @@ export function AlertChannelsSection() {
           <Bell className="mx-auto mb-3 text-gray-300" size={32} />
           <p className="text-gray-500 text-sm font-medium">No alert channels yet</p>
           <p className="text-gray-400 text-xs mt-1">
-            Add an email to receive alerts when monitors go down or recover
+            Add email, Slack, or Discord to receive alerts when monitors go down or recover
           </p>
         </Card>
       ) : (
@@ -84,11 +138,11 @@ export function AlertChannelsSection() {
           {channels.map(ch => (
             <Card key={ch.id} className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Bell size={16} className="text-indigo-500 shrink-0" />
+                <span className="text-lg">{channelIcon(ch.type)}</span>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{ch.config.email}</p>
-                  <p className="text-xs text-gray-400">
-                    Email{ch.is_default ? ' · Default' : ''}
+                  <p className="text-sm font-medium text-gray-900">{channelLabel(ch)}</p>
+                  <p className="text-xs text-gray-400 capitalize">
+                    {ch.type}{ch.is_default ? ' · Default' : ''}
                   </p>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/checker"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
+	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/webhook"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/logger"
 )
@@ -47,14 +48,21 @@ func main() {
 		checker.NewHTTPChecker(),
 	}
 
-	// Notifiers — use Resend if key is present, otherwise log to console
-	var notifiers []outbound.Notifier
+	// Notifiers — email + webhook (Slack + Discord) always registered.
+	// Email uses Resend if key present, otherwise logs to console.
+	var emailNotifier outbound.Notifier
 	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
-		notifiers = []outbound.Notifier{email.NewNotifier(resendKey, mustEnv("FROM_EMAIL"))}
+		emailNotifier = email.NewNotifier(resendKey, mustEnv("FROM_EMAIL"))
 		log.Info("using Resend notifier", "from", mustEnv("FROM_EMAIL"))
 	} else {
-		notifiers = []outbound.Notifier{email.NewConsoleNotifier()}
+		emailNotifier = email.NewConsoleNotifier()
 		log.Info("RESEND_API_KEY not set — using console notifier (alerts printed to log)")
+	}
+
+	notifiers := []outbound.Notifier{
+		emailNotifier,
+		webhook.NewSlackNotifier(),
+		webhook.NewDiscordNotifier(),
 	}
 
 	w := checker.NewWorker(

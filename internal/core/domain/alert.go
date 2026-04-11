@@ -9,10 +9,9 @@ import (
 type AlertChannelType string
 
 const (
-	AlertChannelEmail    AlertChannelType = "email"
-	// AlertChannelSlack    AlertChannelType = "slack"    // Roll-out 2
-	// AlertChannelDiscord  AlertChannelType = "discord"  // Roll-out 2
-	// AlertChannelTelegram AlertChannelType = "telegram" // Roll-out 2
+	AlertChannelEmail   AlertChannelType = "email"
+	AlertChannelSlack   AlertChannelType = "slack"
+	AlertChannelDiscord AlertChannelType = "discord"
 )
 
 // AlertChannel stores the type + all config as a JSON blob.

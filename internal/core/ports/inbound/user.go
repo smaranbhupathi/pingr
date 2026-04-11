@@ -42,6 +42,13 @@ func (i CreateAlertChannelInput) Validate() map[string]string {
 		} else if len(email) < 3 {
 			errs["config.email"] = "invalid email"
 		}
+	case domain.AlertChannelSlack, domain.AlertChannelDiscord:
+		url, ok := i.Config["webhook_url"].(string)
+		if !ok || url == "" {
+			errs["config.webhook_url"] = "required"
+		} else if len(url) < 10 {
+			errs["config.webhook_url"] = "invalid webhook URL"
+		}
 	default:
 		errs["type"] = "unsupported channel type"
 	}
