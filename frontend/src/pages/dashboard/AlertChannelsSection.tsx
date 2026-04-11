@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { userApi } from '../../api/user'
+import { userApi, AlertChannel } from '../../api/user'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
@@ -35,6 +35,23 @@ function channelIcon(type: string) {
   return CHANNEL_OPTIONS.find(o => o.type === type)?.icon ?? '🔔'
 }
 
+function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={e => { e.preventDefault(); e.stopPropagation(); onChange(!enabled) }}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+        enabled ? 'bg-indigo-500' : 'bg-gray-200'
+      }`}
+      title={enabled ? 'Disable channel' : 'Enable channel'}
+    >
+      <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+        enabled ? 'translate-x-4' : 'translate-x-0'
+      }`} />
+    </button>
+  )
+}
+
 export function AlertChannelsSection() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -63,6 +80,12 @@ export function AlertChannelsSection() {
       setErr('')
     },
     onError: (e: any) => setErr(e.response?.data?.error ?? 'Failed to create channel'),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      userApi.toggleAlertChannel(id, enabled),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-channels'] }),
   })
 
   const deleteMutation = useMutation({
@@ -157,7 +180,7 @@ export function AlertChannelsSection() {
       ) : (
         <div className="space-y-2">
           {channels.map(ch => (
-            <Card key={ch.id} className="p-4 flex items-center justify-between group hover:border-indigo-200 transition-colors">
+            <Card key={ch.id} className={`p-4 flex items-center justify-between group hover:border-indigo-200 transition-colors ${!ch.is_enabled ? 'opacity-60' : ''}`}>
               <Link
                 to={`/dashboard/alert-channels/${ch.id}`}
                 className="flex items-center gap-3 flex-1 min-w-0"
@@ -169,18 +192,27 @@ export function AlertChannelsSection() {
                     {ch.is_default && (
                       <span className="ml-2 text-xs font-normal text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">Default</span>
                     )}
+                    {!ch.is_enabled && (
+                      <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Paused</span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-400 truncate">{channelSubtitle(ch)}</p>
                 </div>
                 <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-400 shrink-0 ml-auto mr-2" />
               </Link>
-              <button
-                onClick={() => deleteMutation.mutate(ch.id)}
-                className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 shrink-0"
-                title="Delete channel"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Toggle
+                  enabled={ch.is_enabled}
+                  onChange={enabled => toggleMutation.mutate({ id: ch.id, enabled })}
+                />
+                <button
+                  onClick={() => deleteMutation.mutate(ch.id)}
+                  className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                  title="Delete channel"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </Card>
           ))}
         </div>

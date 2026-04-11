@@ -21,6 +21,7 @@ export interface AlertChannel {
   type: string
   config: Record<string, string>
   is_default: boolean
+  is_enabled: boolean
   created_at: string
 }
 
@@ -45,6 +46,9 @@ export const userApi = {
 
   updateAlertChannel: (id: string, name: string) =>
     client.patch(`/alert-channels/${id}`, { name }),
+
+  toggleAlertChannel: (id: string, is_enabled: boolean) =>
+    client.patch(`/alert-channels/${id}`, { is_enabled }),
 
   deleteAlertChannel: (id: string) =>
     client.delete(`/alert-channels/${id}`),

@@ -1,0 +1,40 @@
+# Pingr feature configuration
+# Loaded once at startup. Change a flag → restart the service.
+# All flags default to false if omitted — be explicit.
+
+features:
+
+  # ── Alert channels ───────────────────────────────────────────────────────────
+  # Disabling a type prevents new subscriptions AND silences alerts for that type.
+  email_alerts: true
+  slack_alerts: true
+  discord_alerts: true
+
+  # ── User features ────────────────────────────────────────────────────────────
+  # Avatar uploads require STORAGE_ENDPOINT to be configured in .env
+  avatar_uploads: true
+
+  # Public status page at /status/:username
+  public_status_pages: true
+
+  # Require email verification before first login
+  email_verification: true
+
+  # Allow forgot-password / reset-password flow
+  password_reset: true
+
+  # ── Coming soon — keep false until built ─────────────────────────────────────
+  ssl_expiry_checks: false
+  multi_region_checks: false
+  incident_notes: false
+  on_call_schedules: false
+
+monitoring:
+  # How often the worker polls for due monitors (seconds)
+  worker_tick_seconds: 10
+
+  # Default check interval assigned to new monitors (seconds)
+  default_check_interval_seconds: 60
+
+  # Requests that take longer than this are treated as down
+  max_response_time_ms: 30000

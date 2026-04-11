@@ -24,6 +24,7 @@ type AlertChannel struct {
 	Type      AlertChannelType `json:"type"`
 	Config    map[string]any   `json:"config"`
 	IsDefault bool             `json:"is_default"`
+	IsEnabled bool             `json:"is_enabled"`
 	CreatedAt time.Time        `json:"created_at"`
 }
 

@@ -54,6 +54,7 @@ type AlertChannelRepository interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
 	GetByMonitorID(ctx context.Context, monitorID uuid.UUID) ([]domain.AlertChannel, error)
 	UpdateName(ctx context.Context, id, userID uuid.UUID, name string) error
+	UpdateEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

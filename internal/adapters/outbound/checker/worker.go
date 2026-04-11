@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/smaranbhupathi/pingr/internal/config"
 	"github.com/smaranbhupathi/pingr/internal/core/domain"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 )
@@ -23,6 +24,7 @@ type Worker struct {
 	channels  outbound.AlertChannelRepository
 	checkers  map[domain.MonitorType]outbound.Checker
 	notifiers map[domain.AlertChannelType]outbound.Notifier
+	cfg       *config.Config
 	concLimit int
 }
 
@@ -34,6 +36,7 @@ func NewWorker(
 	channels outbound.AlertChannelRepository,
 	checkers []outbound.Checker,
 	notifiers []outbound.Notifier,
+	cfg *config.Config,
 	concLimit int,
 ) *Worker {
 	checkerMap := make(map[domain.MonitorType]outbound.Checker)
@@ -52,14 +55,16 @@ func NewWorker(
 		channels:  channels,
 		checkers:  checkerMap,
 		notifiers: notifierMap,
+		cfg:       cfg,
 		concLimit: concLimit,
 	}
 }
 
 // Run starts the worker loop. Polls every 10 seconds for due monitors.
 func (w *Worker) Run(ctx context.Context) {
-	slog.Info("worker started", "region", w.region, "concurrency", w.concLimit)
-	ticker := time.NewTicker(10 * time.Second)
+	tick := time.Duration(w.cfg.Monitoring.WorkerTickSeconds) * time.Second
+	slog.Info("worker started", "region", w.region, "concurrency", w.concLimit, "tick", tick)
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
 	w.runBatch(ctx)
@@ -220,6 +225,31 @@ func (w *Worker) sendAlerts(ctx context.Context, event domain.AlertEvent) {
 	}
 
 	for _, ch := range channels {
+		// Per-channel toggle — user disabled this channel
+		if !ch.IsEnabled {
+			slog.Debug("alert channel disabled, skipping", "channel_id", ch.ID, "type", ch.Type)
+			continue
+		}
+
+		// Platform-level feature flag — channel type turned off in config.yaml
+		switch ch.Type {
+		case domain.AlertChannelEmail:
+			if !w.cfg.Features.EmailAlerts {
+				slog.Debug("email alerts disabled in config, skipping", "channel_id", ch.ID)
+				continue
+			}
+		case domain.AlertChannelSlack:
+			if !w.cfg.Features.SlackAlerts {
+				slog.Debug("slack alerts disabled in config, skipping", "channel_id", ch.ID)
+				continue
+			}
+		case domain.AlertChannelDiscord:
+			if !w.cfg.Features.DiscordAlerts {
+				slog.Debug("discord alerts disabled in config, skipping", "channel_id", ch.ID)
+				continue
+			}
+		}
+
 		notifier, ok := w.notifiers[ch.Type]
 		if !ok {
 			slog.Warn("no notifier for channel type", "type", ch.Type, "channel_id", ch.ID)

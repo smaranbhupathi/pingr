@@ -13,6 +13,7 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/email"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/webhook"
+	"github.com/smaranbhupathi/pingr/internal/config"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/logger"
 )
@@ -24,6 +25,18 @@ func main() {
 
 	env := envOr("APP_ENV", "dev")
 	log := logger.New(env)
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Error("failed to load config.yaml", "error", err)
+		os.Exit(1)
+	}
+	log.Info("config loaded",
+		"email_alerts", cfg.Features.EmailAlerts,
+		"slack_alerts", cfg.Features.SlackAlerts,
+		"discord_alerts", cfg.Features.DiscordAlerts,
+		"worker_tick_seconds", cfg.Monitoring.WorkerTickSeconds,
+	)
 
 	log.Info("starting worker", "env", env)
 
@@ -73,6 +86,7 @@ func main() {
 		alertChannelRepo,
 		checkers,
 		notifiers,
+		cfg,
 		20,
 	)
 

@@ -19,6 +19,7 @@ import (
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/postgres"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/storage"
 	"github.com/smaranbhupathi/pingr/internal/adapters/outbound/webhook"
+	"github.com/smaranbhupathi/pingr/internal/config"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
 	"github.com/smaranbhupathi/pingr/internal/logger"
@@ -31,6 +32,17 @@ func main() {
 
 	env := envOr("APP_ENV", "dev")
 	log := logger.New(env)
+
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load config.yaml", "error", err)
+		os.Exit(1)
+	}
+	log.Info("config loaded",
+		"email_alerts", cfg.Features.EmailAlerts,
+		"slack_alerts", cfg.Features.SlackAlerts,
+		"discord_alerts", cfg.Features.DiscordAlerts,
+	)
 
 	log.Info("starting API server", "env", env)
 
@@ -101,7 +113,7 @@ func main() {
 	// HTTP handlers
 	authH    := handler.NewAuthHandler(authSvc, log)
 	monitorH := handler.NewMonitorHandler(monitorSvc, log)
-	userH    := handler.NewUserHandler(userSvc, log)
+	userH    := handler.NewUserHandler(userSvc, cfg, log)
 
 	// Rate limiter — in-memory sliding window.
 	// To switch to Redis: replace NewMemoryStore() with NewRedisStore(redisClient).

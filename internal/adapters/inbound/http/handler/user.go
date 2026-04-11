@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smaranbhupathi/pingr/internal/adapters/inbound/http/middleware"
+	"github.com/smaranbhupathi/pingr/internal/config"
 	"github.com/smaranbhupathi/pingr/internal/core/domain"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/inbound"
 	"github.com/smaranbhupathi/pingr/internal/core/services"
@@ -17,11 +18,12 @@ import (
 
 type UserHandler struct {
 	users inbound.UserService
+	cfg   *config.Config
 	log   *slog.Logger
 }
 
-func NewUserHandler(users inbound.UserService, log *slog.Logger) *UserHandler {
-	return &UserHandler{users: users, log: log}
+func NewUserHandler(users inbound.UserService, cfg *config.Config, log *slog.Logger) *UserHandler {
+	return &UserHandler{users: users, cfg: cfg, log: log}
 }
 
 func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +63,25 @@ func (h *UserHandler) CreateAlertChannel(w http.ResponseWriter, r *http.Request)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		Error(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+
+	// Feature-flag check — refuse creation if the channel type is disabled in config.yaml
+	switch body.Type {
+	case domain.AlertChannelEmail:
+		if !h.cfg.Features.EmailAlerts {
+			Error(w, http.StatusForbidden, "email alerts are currently disabled")
+			return
+		}
+	case domain.AlertChannelSlack:
+		if !h.cfg.Features.SlackAlerts {
+			Error(w, http.StatusForbidden, "slack alerts are currently disabled")
+			return
+		}
+	case domain.AlertChannelDiscord:
+		if !h.cfg.Features.DiscordAlerts {
+			Error(w, http.StatusForbidden, "discord alerts are currently disabled")
+			return
+		}
 	}
 
 	input := inbound.CreateAlertChannelInput{
@@ -156,21 +177,36 @@ func (h *UserHandler) UpdateAlertChannel(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Both fields are optional — send only what you want to change.
 	var body struct {
-		Name string `json:"name"`
+		Name      *string `json:"name"`
+		IsEnabled *bool   `json:"is_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if err := h.users.UpdateAlertChannelName(r.Context(), channelID, userID, body.Name); err != nil {
-		if errors.Is(err, services.ErrAlertChannelNotFound) {
-			Error(w, http.StatusNotFound, "alert channel not found")
+	if body.Name != nil {
+		if err := h.users.UpdateAlertChannelName(r.Context(), channelID, userID, *body.Name); err != nil {
+			if errors.Is(err, services.ErrAlertChannelNotFound) {
+				Error(w, http.StatusNotFound, "alert channel not found")
+				return
+			}
+			Error(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		Error(w, http.StatusBadRequest, err.Error())
-		return
+	}
+
+	if body.IsEnabled != nil {
+		if err := h.users.ToggleAlertChannel(r.Context(), channelID, userID, *body.IsEnabled); err != nil {
+			if errors.Is(err, services.ErrAlertChannelNotFound) {
+				Error(w, http.StatusNotFound, "alert channel not found")
+				return
+			}
+			Error(w, http.StatusInternalServerError, "failed to update channel")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

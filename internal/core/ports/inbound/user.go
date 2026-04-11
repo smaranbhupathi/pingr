@@ -70,6 +70,7 @@ type UserService interface {
 	GetAlertChannel(ctx context.Context, channelID, userID uuid.UUID) (*domain.AlertChannel, error)
 	ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error)
 	UpdateAlertChannelName(ctx context.Context, channelID, userID uuid.UUID, name string) error
+	ToggleAlertChannel(ctx context.Context, channelID, userID uuid.UUID, enabled bool) error
 	DeleteAlertChannel(ctx context.Context, channelID, userID uuid.UUID) error
 	SubscribeMonitorToChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error
 	UnsubscribeMonitorFromChannel(ctx context.Context, monitorID, channelID, userID uuid.UUID) error

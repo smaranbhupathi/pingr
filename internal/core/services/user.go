@@ -131,6 +131,7 @@ func (s *userService) CreateAlertChannel(ctx context.Context, input inbound.Crea
 		Type:      input.Type,
 		Config:    input.Config,
 		IsDefault: input.IsDefault,
+		IsEnabled: true,
 		CreatedAt: time.Now(),
 	}
 	if err := s.alertChannels.Create(ctx, ch); err != nil {
@@ -149,6 +150,14 @@ func (s *userService) GetAlertChannel(ctx context.Context, channelID, userID uui
 
 func (s *userService) ListAlertChannels(ctx context.Context, userID uuid.UUID) ([]domain.AlertChannel, error) {
 	return s.alertChannels.GetByUserID(ctx, userID)
+}
+
+func (s *userService) ToggleAlertChannel(ctx context.Context, channelID, userID uuid.UUID, enabled bool) error {
+	// Verify ownership
+	if _, err := s.alertChannels.GetByID(ctx, channelID, userID); err != nil {
+		return ErrAlertChannelNotFound
+	}
+	return s.alertChannels.UpdateEnabled(ctx, channelID, userID, enabled)
 }
 
 func (s *userService) UpdateAlertChannelName(ctx context.Context, channelID, userID uuid.UUID, name string) error {
