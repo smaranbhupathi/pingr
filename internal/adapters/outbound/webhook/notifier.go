@@ -1,12 +1,4 @@
 // Package webhook provides Slack and Discord alert notifiers.
-// Both platforms accept a simple HTTP POST with JSON — called an "incoming webhook".
-// The user creates a webhook URL in Slack/Discord and pastes it into Pingr.
-// When a monitor goes down, Pingr POSTs to that URL.
-//
-// Interview explanation:
-//   - Slack and Discord both use the same pattern (incoming webhooks) but
-//     different JSON shapes. We implement one notifier per platform.
-//   - Adding Telegram or PagerDuty later = one new file, zero other changes.
 package webhook
 
 import (
@@ -15,11 +7,91 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/smaranbhupathi/pingr/internal/core/domain"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
 )
+
+// notification is the canonical shape every alert is normalised into before
+// being rendered. Both monitor events and incident updates map into this struct
+// so every platform has exactly one renderer and the output is always consistent.
+type notification struct {
+	Emoji    string // 🔴 🟠 🟡 🟢
+	TypeTag  string // DOWN | RECOVERED | INVESTIGATING | IDENTIFIED | MONITORING | RESOLVED
+	Name     string // monitor name  or  incident name
+	Message  string // human-readable description
+	Affected string // "My server (https://…)"  or  "Monitor1, Monitor2"
+	Time     string // "2026-04-11 13:35:13 UTC"
+	Color    int    // Discord embed colour (hex int)
+}
+
+// fromAlertEvent converts a monitor up/down event into a notification.
+func fromAlertEvent(event domain.AlertEvent) notification {
+	switch event.Type {
+	case domain.AlertEventDown:
+		return notification{
+			Emoji:    "🔴",
+			TypeTag:  "DOWN",
+			Name:     event.Monitor.Name,
+			Message:  fmt.Sprintf("%s is unreachable.", event.Monitor.Name),
+			Affected: fmt.Sprintf("%s — %s", event.Monitor.Name, event.Monitor.URL),
+			Time:     event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+			Color:    0xdc2626,
+		}
+	case domain.AlertEventRecovery:
+		return notification{
+			Emoji:    "🟢",
+			TypeTag:  "RECOVERED",
+			Name:     event.Monitor.Name,
+			Message:  fmt.Sprintf("%s has recovered and is back online.", event.Monitor.Name),
+			Affected: fmt.Sprintf("%s — %s", event.Monitor.Name, event.Monitor.URL),
+			Time:     event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+			Color:    0x16a34a,
+		}
+	default:
+		return notification{}
+	}
+}
+
+// fromIncidentUpdate converts an incident update into a notification.
+func fromIncidentUpdate(incident domain.Incident, update domain.IncidentUpdate) notification {
+	affected := "—"
+	if len(incident.Monitors) > 0 {
+		names := make([]string, 0, len(incident.Monitors))
+		for _, m := range incident.Monitors {
+			names = append(names, m.Name)
+		}
+		affected = strings.Join(names, ", ")
+	}
+
+	emoji, typeTag, color := statusMeta(update.Status)
+	return notification{
+		Emoji:    emoji,
+		TypeTag:  typeTag,
+		Name:     incident.Name,
+		Message:  update.Message,
+		Affected: affected,
+		Time:     update.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+		Color:    color,
+	}
+}
+
+func statusMeta(s domain.IncidentStatus) (emoji, typeTag string, color int) {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "🔴", "INVESTIGATING", 0xdc2626
+	case domain.IncidentStatusIdentified:
+		return "🟠", "IDENTIFIED", 0xf97316
+	case domain.IncidentStatusMonitoring:
+		return "🟡", "MONITORING", 0xeab308
+	case domain.IncidentStatusResolved:
+		return "🟢", "RESOLVED", 0x16a34a
+	default:
+		return "⚪", strings.ToUpper(string(s)), 0x6b7280
+	}
+}
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
 
@@ -29,47 +101,44 @@ func NewSlackNotifier() outbound.Notifier {
 	return &slackNotifier{client: &http.Client{Timeout: 10 * time.Second}}
 }
 
-func (n *slackNotifier) Type() domain.AlertChannelType {
-	return domain.AlertChannelSlack
-}
+func (n *slackNotifier) Type() domain.AlertChannelType { return domain.AlertChannelSlack }
 
 func (n *slackNotifier) SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("slack notifier: missing webhook_url in config")
+	url, err := webhookURL(config, "slack")
+	if err != nil {
+		return err
 	}
-	text := fmt.Sprintf("✅ *%s* is now subscribed to Pingr alerts for *%s* (<%s|%s>)\nYou'll be notified here when the monitor goes down or recovers.",
-		"This channel", monitorName, monitorURL, monitorURL,
+	text := fmt.Sprintf("✅ *This channel* is now subscribed to Pingr alerts for *%s* (<%s|%s>)\nYou'll be notified here when the monitor goes down or recovers.",
+		monitorName, monitorURL, monitorURL,
 	)
-	return post(ctx, n.client, webhookURL, map[string]string{"text": text})
+	return post(ctx, n.client, url, map[string]string{"text": text})
 }
 
 func (n *slackNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("slack notifier: missing webhook_url in config")
+	url, err := webhookURL(config, "slack")
+	if err != nil {
+		return err
 	}
+	return post(ctx, n.client, url, map[string]string{"text": slackText(fromAlertEvent(event))})
+}
 
-	var text string
-	switch event.Type {
-	case domain.AlertEventDown:
-		text = fmt.Sprintf("🔴 *%s* is DOWN\n<%s|%s>\nIncident started at %s UTC",
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.Monitor.URL,
-			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
-	case domain.AlertEventRecovery:
-		text = fmt.Sprintf("🟢 *%s* is back UP\n<%s|%s>\nRecovered at %s UTC",
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.Monitor.URL,
-			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
+func (n *slackNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
+	url, err := webhookURL(config, "slack")
+	if err != nil {
+		return err
 	}
+	return post(ctx, n.client, url, map[string]string{"text": slackText(fromIncidentUpdate(incident, update))})
+}
 
-	payload := map[string]string{"text": text}
-	return post(ctx, n.client, webhookURL, payload)
+// slackText renders a notification into Slack mrkdwn text.
+func slackText(n notification) string {
+	return fmt.Sprintf(
+		"%s *[%s]* %s\n\n%s\n\n*Affected:* %s\n*Time:* %s",
+		n.Emoji, n.TypeTag, n.Name,
+		n.Message,
+		n.Affected,
+		n.Time,
+	)
 }
 
 // ── Discord ───────────────────────────────────────────────────────────────────
@@ -80,73 +149,37 @@ func NewDiscordNotifier() outbound.Notifier {
 	return &discordNotifier{client: &http.Client{Timeout: 10 * time.Second}}
 }
 
-func (n *discordNotifier) Type() domain.AlertChannelType {
-	return domain.AlertChannelDiscord
-}
+func (n *discordNotifier) Type() domain.AlertChannelType { return domain.AlertChannelDiscord }
 
 func (n *discordNotifier) SendSubscriptionConfirmation(ctx context.Context, monitorName, monitorURL string, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("discord notifier: missing webhook_url in config")
+	url, err := webhookURL(config, "discord")
+	if err != nil {
+		return err
 	}
-	content := fmt.Sprintf("✅ **%s** is now subscribed to Pingr alerts for **%s** (%s)\nYou'll be notified here when the monitor goes down or recovers.",
-		"This channel", monitorName, monitorURL,
+	content := fmt.Sprintf("✅ **This channel** is now subscribed to Pingr alerts for **%s** (%s)\nYou'll be notified here when the monitor goes down or recovers.",
+		monitorName, monitorURL,
 	)
-	return post(ctx, n.client, webhookURL, map[string]string{"content": content})
+	return post(ctx, n.client, url, map[string]string{"content": content})
 }
 
 func (n *discordNotifier) Send(ctx context.Context, event domain.AlertEvent, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("discord notifier: missing webhook_url in config")
+	url, err := webhookURL(config, "discord")
+	if err != nil {
+		return err
 	}
-
-	var content string
-	switch event.Type {
-	case domain.AlertEventDown:
-		content = fmt.Sprintf("🔴 **%s** is DOWN\n%s\nIncident started at %s UTC",
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
-	case domain.AlertEventRecovery:
-		content = fmt.Sprintf("🟢 **%s** is back UP\n%s\nRecovered at %s UTC",
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
-	}
-
-	payload := map[string]string{"content": content}
-	return post(ctx, n.client, webhookURL, payload)
-}
-
-func (n *slackNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("slack notifier: missing webhook_url in config")
-	}
-
-	emoji := incidentEmoji(update.Status)
-	monitorNames := incidentMonitorNames(incident)
-
-	text := fmt.Sprintf("%s *[%s] %s*\n\n%s\n\n*Affected:* %s\n*Updated:* %s UTC",
-		emoji,
-		incidentStatusLabel(update.Status),
-		incident.Name,
-		update.Message,
-		monitorNames,
-		update.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
-	)
-	return post(ctx, n.client, webhookURL, map[string]string{"text": text})
+	return post(ctx, n.client, url, discordEmbed(fromAlertEvent(event)))
 }
 
 func (n *discordNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
-	webhookURL, ok := config["webhook_url"].(string)
-	if !ok || webhookURL == "" {
-		return fmt.Errorf("discord notifier: missing webhook_url in config")
+	url, err := webhookURL(config, "discord")
+	if err != nil {
+		return err
 	}
+	return post(ctx, n.client, url, discordEmbed(fromIncidentUpdate(incident, update)))
+}
 
+// discordEmbed renders a notification into a Discord embed payload.
+func discordEmbed(n notification) map[string]any {
 	type field struct {
 		Name   string `json:"name"`
 		Value  string `json:"value"`
@@ -158,95 +191,34 @@ func (n *discordNotifier) SendIncidentUpdate(ctx context.Context, incident domai
 		Color       int     `json:"color"`
 		Fields      []field `json:"fields"`
 	}
-
-	payload := map[string]any{
+	return map[string]any{
 		"embeds": []embed{{
-			Title:       fmt.Sprintf("%s Incident Update: %s", incidentEmoji(update.Status), incident.Name),
-			Description: update.Message,
-			Color:       incidentColor(update.Status),
+			Title:       fmt.Sprintf("%s [%s] %s", n.Emoji, n.TypeTag, n.Name),
+			Description: n.Message,
+			Color:       n.Color,
 			Fields: []field{
-				{Name: "Status", Value: incidentStatusLabel(update.Status), Inline: true},
-				{Name: "Affected", Value: incidentMonitorNames(incident), Inline: true},
-				{Name: "Updated", Value: update.CreatedAt.UTC().Format("2006-01-02 15:04:05") + " UTC", Inline: false},
+				{Name: "Affected", Value: n.Affected, Inline: true},
+				{Name: "Time", Value: n.Time, Inline: true},
 			},
 		}},
 	}
-	return post(ctx, n.client, webhookURL, payload)
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-func incidentStatusLabel(s domain.IncidentStatus) string {
-	switch s {
-	case domain.IncidentStatusInvestigating:
-		return "Investigating"
-	case domain.IncidentStatusIdentified:
-		return "Identified"
-	case domain.IncidentStatusMonitoring:
-		return "Monitoring"
-	case domain.IncidentStatusResolved:
-		return "Resolved"
-	default:
-		return string(s)
-	}
-}
-
-func incidentEmoji(s domain.IncidentStatus) string {
-	switch s {
-	case domain.IncidentStatusInvestigating:
-		return "🔴"
-	case domain.IncidentStatusIdentified:
-		return "🟠"
-	case domain.IncidentStatusMonitoring:
-		return "🟡"
-	case domain.IncidentStatusResolved:
-		return "🟢"
-	default:
-		return "⚪"
-	}
-}
-
-func incidentColor(s domain.IncidentStatus) int {
-	switch s {
-	case domain.IncidentStatusInvestigating:
-		return 0xdc2626 // red
-	case domain.IncidentStatusIdentified:
-		return 0xf97316 // orange
-	case domain.IncidentStatusMonitoring:
-		return 0xeab308 // yellow
-	case domain.IncidentStatusResolved:
-		return 0x16a34a // green
-	default:
-		return 0x6b7280
-	}
-}
-
-func incidentMonitorNames(incident domain.Incident) string {
-	if len(incident.Monitors) == 0 {
-		return "—"
-	}
-	names := make([]string, 0, len(incident.Monitors))
-	for _, m := range incident.Monitors {
-		names = append(names, m.Name)
-	}
-	result := ""
-	for i, n := range names {
-		if i > 0 {
-			result += ", "
-		}
-		result += n
-	}
-	return result
 }
 
 // ── shared ────────────────────────────────────────────────────────────────────
+
+func webhookURL(config map[string]any, platform string) (string, error) {
+	url, ok := config["webhook_url"].(string)
+	if !ok || url == "" {
+		return "", fmt.Errorf("%s notifier: missing webhook_url in config", platform)
+	}
+	return url, nil
+}
 
 func post(ctx context.Context, client *http.Client, url string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err

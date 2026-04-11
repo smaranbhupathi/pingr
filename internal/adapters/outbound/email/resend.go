@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/smaranbhupathi/pingr/internal/core/domain"
 	"github.com/smaranbhupathi/pingr/internal/core/ports/outbound"
@@ -137,64 +138,7 @@ func (n *emailNotifier) Send(ctx context.Context, event domain.AlertEvent, confi
 	if !ok || toEmail == "" {
 		return fmt.Errorf("email notifier: missing email in config")
 	}
-
-	var subject, html string
-	switch event.Type {
-	case domain.AlertEventDown:
-		subject = fmt.Sprintf("🔴 %s is DOWN", event.Monitor.Name)
-		html = fmt.Sprintf(`<!DOCTYPE html>
-<html><body style="font-family:sans-serif;background:#f9fafb;margin:0;padding:40px 0;">
-<div style="max-width:480px;margin:0 auto;background:white;border-radius:12px;padding:40px;border:1px solid #fecaca;">
-  <h1 style="color:#4f46e5;font-size:22px;margin:0 0 4px;">Pingr</h1>
-  <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Uptime monitoring, simplified.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin:0 0 16px;">
-    <span style="font-size:28px;">🔴</span>
-    <h2 style="color:#dc2626;font-size:20px;margin:0;">%s is DOWN</h2>
-  </div>
-  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
-    <p style="margin:0;color:#7f1d1d;font-size:13px;font-weight:600;">MONITOR</p>
-    <p style="margin:4px 0 0;font-weight:600;color:#1f2937;">%s</p>
-    <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">%s</p>
-    <p style="margin:8px 0 0;color:#9ca3af;font-size:12px;">Detected at %s UTC</p>
-  </div>
-  <p style="color:#374151;margin:0;font-size:14px;line-height:1.6;">We'll notify you again when the monitor recovers.</p>
-</div>
-</body></html>`,
-			event.Monitor.Name,
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
-	case domain.AlertEventRecovery:
-		subject = fmt.Sprintf("🟢 %s is back UP", event.Monitor.Name)
-		html = fmt.Sprintf(`<!DOCTYPE html>
-<html><body style="font-family:sans-serif;background:#f9fafb;margin:0;padding:40px 0;">
-<div style="max-width:480px;margin:0 auto;background:white;border-radius:12px;padding:40px;border:1px solid #bbf7d0;">
-  <h1 style="color:#4f46e5;font-size:22px;margin:0 0 4px;">Pingr</h1>
-  <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Uptime monitoring, simplified.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin:0 0 16px;">
-    <span style="font-size:28px;">🟢</span>
-    <h2 style="color:#16a34a;font-size:20px;margin:0;">%s is back UP</h2>
-  </div>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
-    <p style="margin:0;color:#14532d;font-size:13px;font-weight:600;">MONITOR</p>
-    <p style="margin:4px 0 0;font-weight:600;color:#1f2937;">%s</p>
-    <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">%s</p>
-    <p style="margin:8px 0 0;color:#9ca3af;font-size:12px;">Recovered at %s UTC</p>
-  </div>
-  <p style="color:#374151;margin:0;font-size:14px;line-height:1.6;">Your monitor is healthy again. 🎉</p>
-</div>
-</body></html>`,
-			event.Monitor.Name,
-			event.Monitor.Name,
-			event.Monitor.URL,
-			event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05"),
-		)
-	default:
-		return fmt.Errorf("unknown alert event type: %s", event.Type)
-	}
-
-	return sendViaResend(ctx, n.httpClient, n.apiKey, n.fromEmail, toEmail, subject, html)
+	return n.sendNotification(ctx, toEmail, emailNotifFromAlertEvent(event))
 }
 
 func (n *emailNotifier) SendIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate, config map[string]any) error {
@@ -202,91 +146,141 @@ func (n *emailNotifier) SendIncidentUpdate(ctx context.Context, incident domain.
 	if !ok || toEmail == "" {
 		return fmt.Errorf("email notifier: missing email in config")
 	}
+	return n.sendNotification(ctx, toEmail, emailNotifFromIncidentUpdate(incident, update))
+}
 
-	statusLabel := incidentStatusLabel(update.Status)
-	statusColor := incidentHexColor(update.Status)
-	monitorNames := incidentMonitorNamesHTML(incident)
+// emailNotif holds the normalised fields for the shared HTML template.
+type emailNotif struct {
+	Emoji    string
+	TypeTag  string
+	Name     string
+	Message  string
+	Affected string
+	Time     string
+	HexColor string // border + badge colour
+}
 
-	subject := fmt.Sprintf("[%s] %s", statusLabel, incident.Name)
+func emailNotifFromAlertEvent(event domain.AlertEvent) emailNotif {
+	switch event.Type {
+	case domain.AlertEventDown:
+		return emailNotif{
+			Emoji:    "🔴",
+			TypeTag:  "DOWN",
+			Name:     event.Monitor.Name,
+			Message:  fmt.Sprintf("%s is unreachable.", event.Monitor.Name),
+			Affected: fmt.Sprintf("%s — %s", event.Monitor.Name, event.Monitor.URL),
+			Time:     event.OutageEvent.StartedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+			HexColor: "#dc2626",
+		}
+	case domain.AlertEventRecovery:
+		return emailNotif{
+			Emoji:    "🟢",
+			TypeTag:  "RECOVERED",
+			Name:     event.Monitor.Name,
+			Message:  fmt.Sprintf("%s has recovered and is back online.", event.Monitor.Name),
+			Affected: fmt.Sprintf("%s — %s", event.Monitor.Name, event.Monitor.URL),
+			Time:     event.OutageEvent.ResolvedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+			HexColor: "#16a34a",
+		}
+	default:
+		return emailNotif{}
+	}
+}
+
+func emailNotifFromIncidentUpdate(incident domain.Incident, update domain.IncidentUpdate) emailNotif {
+	affected := "—"
+	if len(incident.Monitors) > 0 {
+		parts := make([]string, 0, len(incident.Monitors))
+		for _, m := range incident.Monitors {
+			parts = append(parts, m.Name)
+		}
+		affected = strings.Join(parts, ", ")
+	}
+
+	typeTag, hexColor := incidentEmailMeta(update.Status)
+	emoji := incidentEmailEmoji(update.Status)
+	return emailNotif{
+		Emoji:    emoji,
+		TypeTag:  typeTag,
+		Name:     incident.Name,
+		Message:  update.Message,
+		Affected: affected,
+		Time:     update.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC"),
+		HexColor: hexColor,
+	}
+}
+
+func incidentEmailMeta(s domain.IncidentStatus) (typeTag, hexColor string) {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "INVESTIGATING", "#dc2626"
+	case domain.IncidentStatusIdentified:
+		return "IDENTIFIED", "#f97316"
+	case domain.IncidentStatusMonitoring:
+		return "MONITORING", "#eab308"
+	case domain.IncidentStatusResolved:
+		return "RESOLVED", "#16a34a"
+	default:
+		return strings.ToUpper(string(s)), "#6b7280"
+	}
+}
+
+func incidentEmailEmoji(s domain.IncidentStatus) string {
+	switch s {
+	case domain.IncidentStatusInvestigating:
+		return "🔴"
+	case domain.IncidentStatusIdentified:
+		return "🟠"
+	case domain.IncidentStatusMonitoring:
+		return "🟡"
+	case domain.IncidentStatusResolved:
+		return "🟢"
+	default:
+		return "⚪"
+	}
+}
+
+// sendNotification renders the shared HTML template and dispatches via Resend.
+func (n *emailNotifier) sendNotification(ctx context.Context, toEmail string, notif emailNotif) error {
+	subject := fmt.Sprintf("%s [%s] %s", notif.Emoji, notif.TypeTag, notif.Name)
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html><body style="font-family:sans-serif;background:#f9fafb;margin:0;padding:40px 0;">
-<div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;padding:40px;border:1px solid #e5e7eb;">
-  <h1 style="color:#4f46e5;font-size:22px;margin:0 0 4px;">Pingr</h1>
-  <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Incident Update</p>
+<div style="max-width:500px;margin:0 auto;background:white;border-radius:12px;padding:40px;border:1px solid #e5e7eb;">
 
-  <div style="display:flex;align-items:center;gap:10px;margin:0 0 20px;">
-    <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:%s;color:white;">%s</span>
-    <h2 style="font-size:18px;color:#111827;margin:0;">%s</h2>
+  <h1 style="color:#4f46e5;font-size:22px;margin:0 0 2px;">Pingr</h1>
+  <p style="color:#9ca3af;font-size:12px;margin:0 0 28px;">Uptime monitoring, simplified.</p>
+
+  <div style="display:flex;align-items:center;gap:10px;margin:0 0 16px;">
+    <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;background:%s;color:white;">%s</span>
+    <h2 style="font-size:17px;color:#111827;margin:0;font-weight:600;">%s</h2>
   </div>
 
-  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:0 0 20px;">
+  <div style="background:#f8fafc;border-left:3px solid %s;border-radius:4px;padding:14px 18px;margin:0 0 24px;">
     <p style="margin:0;color:#374151;font-size:14px;line-height:1.7;">%s</p>
   </div>
 
-  <table style="width:100%%;border-collapse:collapse;font-size:13px;color:#6b7280;">
-    <tr>
-      <td style="padding:6px 0;font-weight:600;color:#374151;width:120px;">Affected</td>
-      <td style="padding:6px 0;">%s</td>
+  <table style="width:100%%;border-collapse:collapse;font-size:13px;">
+    <tr style="border-top:1px solid #f3f4f6;">
+      <td style="padding:10px 0 10px;color:#6b7280;font-weight:600;width:100px;">Affected</td>
+      <td style="padding:10px 0 10px;color:#374151;">%s</td>
     </tr>
-    <tr>
-      <td style="padding:6px 0;font-weight:600;color:#374151;">Updated at</td>
-      <td style="padding:6px 0;">%s UTC</td>
+    <tr style="border-top:1px solid #f3f4f6;">
+      <td style="padding:10px 0;color:#6b7280;font-weight:600;">Time</td>
+      <td style="padding:10px 0;color:#374151;">%s</td>
     </tr>
   </table>
+
 </div>
 </body></html>`,
-		statusColor, statusLabel,
-		incident.Name,
-		update.Message,
-		monitorNames,
-		update.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
+		notif.HexColor, notif.TypeTag,
+		notif.Name,
+		notif.HexColor,
+		notif.Message,
+		notif.Affected,
+		notif.Time,
 	)
 
 	return sendViaResend(ctx, n.httpClient, n.apiKey, n.fromEmail, toEmail, subject, html)
-}
-
-func incidentStatusLabel(s domain.IncidentStatus) string {
-	switch s {
-	case domain.IncidentStatusInvestigating:
-		return "Investigating"
-	case domain.IncidentStatusIdentified:
-		return "Identified"
-	case domain.IncidentStatusMonitoring:
-		return "Monitoring"
-	case domain.IncidentStatusResolved:
-		return "Resolved"
-	default:
-		return string(s)
-	}
-}
-
-func incidentHexColor(s domain.IncidentStatus) string {
-	switch s {
-	case domain.IncidentStatusInvestigating:
-		return "#dc2626"
-	case domain.IncidentStatusIdentified:
-		return "#f97316"
-	case domain.IncidentStatusMonitoring:
-		return "#eab308"
-	case domain.IncidentStatusResolved:
-		return "#16a34a"
-	default:
-		return "#6b7280"
-	}
-}
-
-func incidentMonitorNamesHTML(incident domain.Incident) string {
-	if len(incident.Monitors) == 0 {
-		return "—"
-	}
-	result := ""
-	for i, m := range incident.Monitors {
-		if i > 0 {
-			result += ", "
-		}
-		result += m.Name
-	}
-	return result
 }
 
 func sendViaResend(ctx context.Context, client *http.Client, apiKey, from, to, subject, html string) error {
