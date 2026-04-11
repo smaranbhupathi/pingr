@@ -14,11 +14,8 @@ const CHANNEL_OPTIONS: { type: ChannelType; label: string; icon: string; placeho
   { type: 'discord', label: 'Discord', icon: '🎮',  placeholder: 'https://discord.com/api/webhooks/...' },
 ]
 
-function channelLabel(ch: { type: string; config: Record<string, string> }) {
-  if (ch.type === 'email')   return ch.config.email
-  if (ch.type === 'slack')   return 'Slack webhook'
-  if (ch.type === 'discord') return 'Discord webhook'
-  return ch.type
+function channelLabel(ch: { name: string; type: string; config: Record<string, string> }) {
+  return ch.name || (ch.type === 'email' ? ch.config.email : ch.type)
 }
 
 function channelIcon(type: string) {
@@ -29,6 +26,7 @@ export function AlertChannelsSection() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [type, setType] = useState<ChannelType>('email')
+  const [name, setName] = useState('')
   const [value, setValue] = useState('')
   const [err, setErr] = useState('')
 
@@ -42,10 +40,11 @@ export function AlertChannelsSection() {
       const config = type === 'email'
         ? { email: value }
         : { webhook_url: value }
-      return userApi.createAlertChannel(type, config, channels.length === 0)
+      return userApi.createAlertChannel(name, type, config, channels.length === 0)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-channels'] })
+      setName('')
       setValue('')
       setShowForm(false)
       setErr('')
@@ -76,7 +75,7 @@ export function AlertChannelsSection() {
             {CHANNEL_OPTIONS.map(opt => (
               <button
                 key={opt.type}
-                onClick={() => { setType(opt.type); setValue(''); setErr('') }}
+                onClick={() => { setType(opt.type); setValue(''); setErr(''); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
                   type === opt.type
                     ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
@@ -88,8 +87,17 @@ export function AlertChannelsSection() {
             ))}
           </div>
 
-          {/* Input */}
+          {/* Name + value inputs */}
           <div className="flex gap-3 items-end">
+            <div className="w-40 shrink-0">
+              <Input
+                label="Channel name"
+                type="text"
+                placeholder="e.g. Team Slack"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
             <div className="flex-1">
               <Input
                 label={selected.label}

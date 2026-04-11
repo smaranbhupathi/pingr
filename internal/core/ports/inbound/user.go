@@ -27,6 +27,7 @@ type AvatarUploadResult struct {
 
 type CreateAlertChannelInput struct {
 	UserID    uuid.UUID
+	Name      string
 	Type      domain.AlertChannelType
 	Config    map[string]any
 	IsDefault bool
@@ -34,6 +35,9 @@ type CreateAlertChannelInput struct {
 
 func (i CreateAlertChannelInput) Validate() map[string]string {
 	errs := map[string]string{}
+	if i.Name == "" {
+		errs["name"] = "required"
+	}
 	switch i.Type {
 	case domain.AlertChannelEmail:
 		email, ok := i.Config["email"].(string)

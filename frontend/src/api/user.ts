@@ -17,6 +17,7 @@ export interface AvatarUploadResult {
 export interface AlertChannel {
   id: string
   user_id: string
+  name: string
   type: string
   config: Record<string, string>
   is_default: boolean
@@ -36,8 +37,8 @@ export const userApi = {
   listAlertChannels: () =>
     client.get<AlertChannel[]>('/alert-channels'),
 
-  createAlertChannel: (type: string, config: Record<string, string>, is_default = false) =>
-    client.post<AlertChannel>('/alert-channels', { type, config, is_default }),
+  createAlertChannel: (name: string, type: string, config: Record<string, string>, is_default = false) =>
+    client.post<AlertChannel>('/alert-channels', { name, type, config, is_default }),
 
   deleteAlertChannel: (id: string) =>
     client.delete(`/alert-channels/${id}`),

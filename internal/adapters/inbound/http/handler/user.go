@@ -53,6 +53,7 @@ func (h *UserHandler) CreateAlertChannel(w http.ResponseWriter, r *http.Request)
 	}
 
 	var body struct {
+		Name      string                  `json:"name"`
 		Type      domain.AlertChannelType `json:"type"`
 		Config    map[string]any          `json:"config"`
 		IsDefault bool                    `json:"is_default"`
@@ -64,6 +65,7 @@ func (h *UserHandler) CreateAlertChannel(w http.ResponseWriter, r *http.Request)
 
 	input := inbound.CreateAlertChannelInput{
 		UserID:    userID,
+		Name:      body.Name,
 		Type:      body.Type,
 		Config:    body.Config,
 		IsDefault: body.IsDefault,

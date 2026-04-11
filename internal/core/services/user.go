@@ -120,6 +120,7 @@ func (s *userService) CreateAlertChannel(ctx context.Context, input inbound.Crea
 	ch := &domain.AlertChannel{
 		ID:        uuid.New(),
 		UserID:    input.UserID,
+		Name:      input.Name,
 		Type:      input.Type,
 		Config:    input.Config,
 		IsDefault: input.IsDefault,

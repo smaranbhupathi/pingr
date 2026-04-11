@@ -20,6 +20,7 @@ const (
 type AlertChannel struct {
 	ID        uuid.UUID        `json:"id"`
 	UserID    uuid.UUID        `json:"user_id"`
+	Name      string           `json:"name"`
 	Type      AlertChannelType `json:"type"`
 	Config    map[string]any   `json:"config"`
 	IsDefault bool             `json:"is_default"`

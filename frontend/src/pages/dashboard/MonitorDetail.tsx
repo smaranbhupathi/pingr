@@ -213,8 +213,8 @@ function SubscribeSection({ monitorId }: { monitorId: string }) {
           {subscribed.map(ch => (
             <div key={ch.id} className="flex items-center gap-2 text-sm text-gray-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
               <CheckCircle size={14} className="text-green-500 shrink-0" />
-              <span>{ch.config.email}</span>
-              <span className="text-xs text-gray-400 ml-auto mr-2">email · subscribed</span>
+              <span>{ch.name || ch.config.email || ch.type}</span>
+              <span className="text-xs text-gray-400 ml-auto mr-2 capitalize">{ch.type} · subscribed</span>
               <button
                 onClick={() => unsubscribeMutation.mutate(ch.id)}
                 disabled={unsubscribeMutation.isPending}
@@ -248,7 +248,7 @@ function SubscribeSection({ monitorId }: { monitorId: string }) {
               <option value="">Select a channel…</option>
               {available.map(ch => (
                 <option key={ch.id} value={ch.id}>
-                  {ch.config.email} (email)
+                  {ch.name || ch.config.email || ch.type} ({ch.type})
                 </option>
               ))}
             </select>
