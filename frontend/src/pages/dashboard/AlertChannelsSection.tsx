@@ -67,7 +67,7 @@ export function AlertChannelsSection() {
 
   const createMutation = useMutation({
     mutationFn: () => {
-      const config = type === 'email' ? { email: value } : { webhook_url: value }
+      const config: Record<string, string> = type === 'email' ? { email: value } : { webhook_url: value }
       return userApi.createAlertChannel(name, type, config, channels.length === 0)
     },
     onSuccess: () => {

@@ -27,7 +27,6 @@ export function SettingsPage() {
               active={theme === 'light'}
               onClick={() => setTheme('light')}
               preview="bg-white border-gray-200"
-              textPreview="text-gray-800"
             />
             <ThemeOption
               label="Dark"
@@ -35,7 +34,6 @@ export function SettingsPage() {
               active={theme === 'dark'}
               onClick={() => setTheme('dark')}
               preview="bg-gray-900 border-gray-700"
-              textPreview="text-gray-100"
             />
           </div>
         </Card>
@@ -58,14 +56,12 @@ function ThemeOption({
   active,
   onClick,
   preview,
-  textPreview,
 }: {
   label: string
   icon: React.ReactNode
   active: boolean
   onClick: () => void
   preview: string
-  textPreview: string
 }) {
   return (
     <button
