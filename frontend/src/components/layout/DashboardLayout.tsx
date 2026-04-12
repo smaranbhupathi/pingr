@@ -21,9 +21,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   })
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/50 flex flex-col shrink-0 sticky top-0 h-screen overflow-y-auto">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {/* Sidebar — fixed height, never scrolls with content */}
+      <aside className="w-56 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/50 flex flex-col shrink-0 overflow-y-auto">
         {/* Brand */}
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50">
           <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Pingr</Link>
@@ -66,18 +66,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      {/* Right side */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      {/* Right side — header fixed, only main scrolls */}
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* Top header */}
-        <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 flex items-center justify-end shrink-0 sticky top-0 z-10">
+        <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 flex items-center justify-end shrink-0 z-10">
           <UserMenu />
         </header>
 
-        {/* Main content */}
-        <main className="flex-1 px-8 py-8">
-          {children}
-        </main>
-        <Footer />
+        {/* Scrollable content area only */}
+        <div className="flex-1 overflow-y-auto">
+          <main className="px-8 py-8">
+            {children}
+          </main>
+          <Footer />
+        </div>
       </div>
     </div>
   )
