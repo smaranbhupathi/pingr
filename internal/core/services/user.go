@@ -22,12 +22,15 @@ var (
 
 var ErrIncidentNotFound = errors.New("incident not found")
 
+var ErrComponentNotFound = errors.New("component not found")
+
 type userService struct {
 	users         outbound.UserRepository
 	plans         outbound.PlanRepository
 	alertChannels outbound.AlertChannelRepository
 	alertSubs     outbound.AlertSubscriptionRepository
 	monitors      outbound.MonitorRepository
+	components    outbound.ComponentRepository
 	incidents     outbound.IncidentRepository
 	email         outbound.EmailSender
 	storage       outbound.StorageService // nil when storage is not configured
@@ -40,6 +43,7 @@ func NewUserService(
 	alertChannels outbound.AlertChannelRepository,
 	alertSubs outbound.AlertSubscriptionRepository,
 	monitors outbound.MonitorRepository,
+	components outbound.ComponentRepository,
 	incidents outbound.IncidentRepository,
 	email outbound.EmailSender,
 	storage outbound.StorageService,
@@ -55,6 +59,7 @@ func NewUserService(
 		alertChannels: alertChannels,
 		alertSubs:     alertSubs,
 		monitors:      monitors,
+		components:    components,
 		incidents:     incidents,
 		email:         email,
 		storage:       storage,
@@ -310,6 +315,9 @@ func (s *userService) CreateIncident(ctx context.Context, input inbound.CreateIn
 	}
 	inc.Updates = []domain.IncidentUpdate{*update}
 
+	// Apply component_status overrides if provided.
+	s.applyMonitorStatuses(ctx, input.MonitorStatuses)
+
 	if input.Notify {
 		// Re-fetch so Monitors (name/URL) are populated for the notification body.
 		full, err := s.incidents.GetByID(ctx, inc.ID, input.UserID)
@@ -362,6 +370,9 @@ func (s *userService) PostIncidentUpdate(ctx context.Context, input inbound.Post
 	if err := s.incidents.UpdateStatus(ctx, inc.ID, input.Status, resolvedAt); err != nil {
 		return nil, fmt.Errorf("update incident status: %w", err)
 	}
+
+	// Apply component_status overrides if provided.
+	s.applyMonitorStatuses(ctx, input.MonitorStatuses)
 
 	// Fetch the full updated incident (with monitors populated) before notifying.
 	updated, err := s.incidents.GetByID(ctx, inc.ID, input.UserID)
@@ -419,4 +430,78 @@ func (s *userService) fanoutIncidentUpdate(ctx context.Context, incident domain.
 			}
 		}
 	}
+}
+
+// applyMonitorStatuses updates the component_status of affected monitors.
+func (s *userService) applyMonitorStatuses(ctx context.Context, statuses map[uuid.UUID]domain.ComponentStatus) {
+	for monitorID, status := range statuses {
+		if err := s.monitors.UpdateComponentStatus(ctx, monitorID, status); err != nil {
+			slog.Error("apply monitor status: update failed", "monitor_id", monitorID, "status", status, "error", err)
+		}
+	}
+}
+
+// ── Components ────────────────────────────────────────────────────────────────
+
+func (s *userService) CreateComponent(ctx context.Context, input inbound.CreateComponentInput) (*domain.Component, error) {
+	now := time.Now()
+	c := &domain.Component{
+		ID:          uuid.New(),
+		UserID:      input.UserID,
+		Name:        input.Name,
+		Description: input.Description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := s.components.Create(ctx, c); err != nil {
+		return nil, fmt.Errorf("create component: %w", err)
+	}
+	return c, nil
+}
+
+func (s *userService) ListComponents(ctx context.Context, userID uuid.UUID) ([]domain.Component, error) {
+	return s.components.ListByUser(ctx, userID)
+}
+
+func (s *userService) UpdateComponent(ctx context.Context, id, userID uuid.UUID, input inbound.UpdateComponentInput) (*domain.Component, error) {
+	c, err := s.components.GetByID(ctx, id, userID)
+	if err != nil {
+		return nil, ErrComponentNotFound
+	}
+	if input.Name != nil {
+		c.Name = *input.Name
+	}
+	if input.Description != nil {
+		c.Description = *input.Description
+	}
+	if err := s.components.Update(ctx, c); err != nil {
+		return nil, fmt.Errorf("update component: %w", err)
+	}
+	return c, nil
+}
+
+func (s *userService) DeleteComponent(ctx context.Context, id, userID uuid.UUID) error {
+	if _, err := s.components.GetByID(ctx, id, userID); err != nil {
+		return ErrComponentNotFound
+	}
+	return s.components.Delete(ctx, id, userID)
+}
+
+// ── Monitor meta ──────────────────────────────────────────────────────────────
+
+func (s *userService) UpdateMonitorMeta(ctx context.Context, id, userID uuid.UUID, name, description string, componentID *uuid.UUID) (*domain.Monitor, error) {
+	monitor, err := s.monitors.GetByID(ctx, id)
+	if err != nil || monitor.UserID != userID {
+		return nil, ErrMonitorNotFound
+	}
+	if name != "" {
+		monitor.Name = name
+	}
+	monitor.Description = description
+	monitor.ComponentID = componentID
+	monitor.UpdatedAt = time.Now()
+	if err := s.monitors.Update(ctx, monitor); err != nil {
+		return nil, fmt.Errorf("update monitor meta: %w", err)
+	}
+	return monitor, nil
 }

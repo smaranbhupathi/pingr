@@ -17,6 +17,7 @@ import { ProfilePage } from './pages/dashboard/Profile'
 import { SettingsPage } from './pages/dashboard/Settings'
 import { IncidentsPage } from './pages/dashboard/IncidentsPage'
 import { IncidentDetailPage } from './pages/dashboard/IncidentDetail'
+import { ComponentsPage } from './pages/dashboard/ComponentsPage'
 import { StatusPage } from './pages/status/StatusPage'
 import { DocsPage } from './pages/Docs'
 
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/dashboard/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
             <Route path="/dashboard/incidents" element={<RequireAuth><IncidentsPage /></RequireAuth>} />
             <Route path="/dashboard/incidents/:id" element={<RequireAuth><IncidentDetailPage /></RequireAuth>} />
+            <Route path="/dashboard/components" element={<RequireAuth><ComponentsPage /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -19,6 +19,7 @@ type UpdateMonitorInput struct {
 	Name            *string `json:"name"`
 	IntervalSeconds *int    `json:"interval_seconds"`
 	IsActive        *bool   `json:"is_active"`
+	ComponentID     *uuid.UUID `json:"component_id"`
 }
 
 type UptimeStats struct {

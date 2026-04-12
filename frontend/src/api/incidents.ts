@@ -40,11 +40,13 @@ export const incidentsApi = {
     status: IncidentStatus
     message: string
     monitor_ids: string[]
+    monitor_statuses?: Record<string, string>
     notify: boolean
   }) => api.post<Incident>('/incidents', body),
   postUpdate: (id: string, body: {
     status: IncidentStatus
     message: string
+    monitor_statuses?: Record<string, string>
     notify: boolean
   }) => api.post<Incident>(`/incidents/${id}/updates`, body),
 }

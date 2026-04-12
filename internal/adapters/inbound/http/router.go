@@ -17,6 +17,7 @@ func NewRouter(
 	monitorH *handler.MonitorHandler,
 	userH *handler.UserHandler,
 	incidentH *handler.IncidentHandler,
+	componentH *handler.ComponentHandler,
 	jwtSecret string,
 	allowedOrigin string,
 	rlStore ratelimit.Store,
@@ -84,11 +85,20 @@ func NewRouter(
 			r.Post("/", monitorH.Create)
 			r.Get("/{id}", monitorH.Get)
 			r.Patch("/{id}", monitorH.Update)
+			r.Patch("/{id}/meta", userH.UpdateMonitorMeta)
 			r.Delete("/{id}", monitorH.Delete)
 			r.Get("/{id}/graph", monitorH.ResponseTimeGraph)
 			r.Get("/{id}/subscriptions", userH.ListMonitorSubscriptions)
 			r.Post("/{id}/subscribe", userH.SubscribeMonitorToChannel)
 			r.Delete("/{id}/subscriptions/{channelId}", userH.UnsubscribeMonitorFromChannel)
+		})
+
+		// Components
+		r.Route("/components", func(r chi.Router) {
+			r.Get("/", componentH.List)
+			r.Post("/", componentH.Create)
+			r.Patch("/{id}", componentH.Update)
+			r.Delete("/{id}", componentH.Delete)
 		})
 	})
 

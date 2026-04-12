@@ -49,11 +49,12 @@ func (h *IncidentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Name       string                 `json:"name"`
-		Status     domain.IncidentStatus  `json:"status"`
-		Message    string                 `json:"message"`
-		MonitorIDs []string               `json:"monitor_ids"`
-		Notify     bool                   `json:"notify"`
+		Name            string                        `json:"name"`
+		Status          domain.IncidentStatus         `json:"status"`
+		Message         string                        `json:"message"`
+		MonitorIDs      []string                      `json:"monitor_ids"`
+		MonitorStatuses map[string]string             `json:"monitor_statuses"` // monitorID → component_status
+		Notify          bool                          `json:"notify"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		Error(w, http.StatusBadRequest, "invalid request body")
@@ -81,13 +82,16 @@ func (h *IncidentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		monitorIDs = append(monitorIDs, id)
 	}
 
+	monitorStatuses := parseMonitorStatuses(body.MonitorStatuses)
+
 	inc, err := h.users.CreateIncident(r.Context(), inbound.CreateIncidentInput{
-		UserID:     userID,
-		Name:       body.Name,
-		Status:     body.Status,
-		Message:    body.Message,
-		MonitorIDs: monitorIDs,
-		Notify:     body.Notify,
+		UserID:          userID,
+		Name:            body.Name,
+		Status:          body.Status,
+		Message:         body.Message,
+		MonitorIDs:      monitorIDs,
+		MonitorStatuses: monitorStatuses,
+		Notify:          body.Notify,
 	})
 	if err != nil {
 		h.log.ErrorContext(r.Context(), "create incident failed", "user_id", userID, "error", err)
@@ -138,9 +142,10 @@ func (h *IncidentHandler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Status  domain.IncidentStatus `json:"status"`
-		Message string                `json:"message"`
-		Notify  bool                  `json:"notify"`
+		Status          domain.IncidentStatus `json:"status"`
+		Message         string                `json:"message"`
+		MonitorStatuses map[string]string     `json:"monitor_statuses"`
+		Notify          bool                  `json:"notify"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		Error(w, http.StatusBadRequest, "invalid request body")
@@ -156,11 +161,12 @@ func (h *IncidentHandler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inc, err := h.users.PostIncidentUpdate(r.Context(), inbound.PostIncidentUpdateInput{
-		IncidentID: id,
-		UserID:     userID,
-		Status:     body.Status,
-		Message:    body.Message,
-		Notify:     body.Notify,
+		IncidentID:      id,
+		UserID:          userID,
+		Status:          body.Status,
+		Message:         body.Message,
+		MonitorStatuses: parseMonitorStatuses(body.MonitorStatuses),
+		Notify:          body.Notify,
 	})
 	if err != nil {
 		if errors.Is(err, services.ErrIncidentNotFound) {
@@ -173,4 +179,131 @@ func (h *IncidentHandler) PostUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, http.StatusOK, inc)
+}
+
+// parseMonitorStatuses converts map[string]string from JSON into the typed map.
+func parseMonitorStatuses(raw map[string]string) map[uuid.UUID]domain.ComponentStatus {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[uuid.UUID]domain.ComponentStatus, len(raw))
+	for k, v := range raw {
+		id, err := uuid.Parse(k)
+		if err != nil {
+			continue
+		}
+		out[id] = domain.ComponentStatus(v)
+	}
+	return out
+}
+
+// ── Component handler ─────────────────────────────────────────────────────────
+
+type ComponentHandler struct {
+	users inbound.UserService
+	log   *slog.Logger
+}
+
+func NewComponentHandler(users inbound.UserService, log *slog.Logger) *ComponentHandler {
+	return &ComponentHandler{users: users, log: log}
+}
+
+func (h *ComponentHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	components, err := h.users.ListComponents(r.Context(), userID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "failed to list components")
+		return
+	}
+	JSON(w, http.StatusOK, components)
+}
+
+func (h *ComponentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.Name == "" {
+		Error(w, http.StatusUnprocessableEntity, "name is required")
+		return
+	}
+	c, err := h.users.CreateComponent(r.Context(), inbound.CreateComponentInput{
+		UserID:      userID,
+		Name:        body.Name,
+		Description: body.Description,
+	})
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "failed to create component")
+		return
+	}
+	JSON(w, http.StatusCreated, c)
+}
+
+func (h *ComponentHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid component id")
+		return
+	}
+	var body struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	c, err := h.users.UpdateComponent(r.Context(), id, userID, inbound.UpdateComponentInput{
+		Name:        body.Name,
+		Description: body.Description,
+	})
+	if err != nil {
+		if errors.Is(err, services.ErrComponentNotFound) {
+			Error(w, http.StatusNotFound, "component not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to update component")
+		return
+	}
+	JSON(w, http.StatusOK, c)
+}
+
+func (h *ComponentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid component id")
+		return
+	}
+	if err := h.users.DeleteComponent(r.Context(), id, userID); err != nil {
+		if errors.Is(err, services.ErrComponentNotFound) {
+			Error(w, http.StatusNotFound, "component not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "failed to delete component")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

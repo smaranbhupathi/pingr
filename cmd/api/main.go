@@ -64,6 +64,7 @@ func main() {
 	incidentRepo     := postgres.NewIncidentRepository(db)
 	alertChannelRepo := postgres.NewAlertChannelRepository(db)
 	alertSubRepo     := postgres.NewAlertSubscriptionRepository(db)
+	componentRepo    := postgres.NewComponentRepository(db)
 
 	var emailSender outbound.EmailSender
 	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
@@ -117,13 +118,14 @@ func main() {
 		webhook.NewSlackNotifier(),
 		webhook.NewDiscordNotifier(),
 	}
-	userSvc := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, incidentRepo, emailSender, storageSvc, allNotifiers)
+	userSvc := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, componentRepo, incidentRepo, emailSender, storageSvc, allNotifiers)
 
 	// HTTP handlers
-	authH     := handler.NewAuthHandler(authSvc, log)
-	monitorH  := handler.NewMonitorHandler(monitorSvc, log)
-	userH     := handler.NewUserHandler(userSvc, cfg, log)
-	incidentH := handler.NewIncidentHandler(userSvc, log)
+	authH      := handler.NewAuthHandler(authSvc, log)
+	monitorH   := handler.NewMonitorHandler(monitorSvc, log)
+	userH      := handler.NewUserHandler(userSvc, cfg, log)
+	incidentH  := handler.NewIncidentHandler(userSvc, log)
+	componentH := handler.NewComponentHandler(userSvc, log)
 
 	// Rate limiter — in-memory sliding window.
 	// To switch to Redis: replace NewMemoryStore() with NewRedisStore(redisClient).
@@ -133,7 +135,7 @@ func main() {
 	log.Info("rate limiter initialised", "store", "memory")
 
 	allowedOrigin := envOr("ALLOWED_ORIGIN", "*")
-	router := inboundhttp.NewRouter(authH, monitorH, userH, incidentH, mustEnv("JWT_SECRET"), allowedOrigin, rlStore, log)
+	router := inboundhttp.NewRouter(authH, monitorH, userH, incidentH, componentH, mustEnv("JWT_SECRET"), allowedOrigin, rlStore, log)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

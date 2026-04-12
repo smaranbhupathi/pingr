@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { monitorsApi, type MonitorDetail, type DailyUptimeStat } from '../../api/monitors'
+import { monitorsApi, COMPONENT_STATUS_LABEL, COMPONENT_STATUS_COLOR, COMPONENT_STATUS_DOT, type MonitorDetail, type DailyUptimeStat, type ComponentStatus } from '../../api/monitors'
 import type { Incident, IncidentStatus } from '../../api/incidents'
 import { format } from '../../lib/format'
 import { Footer } from '../../components/ui/Footer'
@@ -80,25 +80,26 @@ function UptimeBar({ daily }: { daily: DailyUptimeStat[] }) {
 
 function MonitorRow({ detail }: { detail: MonitorDetail }) {
   const { monitor, uptime, daily_uptime, active_incident } = detail
-  const isDown = monitor.status === 'down'
+  const cs = (monitor.component_status ?? 'operational') as ComponentStatus
+  const isDown = cs !== 'operational' && cs !== 'under_maintenance'
 
   return (
     <div className={`bg-white rounded-xl border p-5 ${isDown ? 'border-red-200' : 'border-gray-200'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isDown ? 'bg-red-500' : 'bg-green-500'}`} />
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${COMPONENT_STATUS_DOT[cs]}`} />
           <div>
             <p className="font-semibold text-gray-900">{monitor.name}</p>
             <p className="text-xs text-gray-400 mt-0.5">{monitor.url}</p>
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className={`text-sm font-semibold ${isDown ? 'text-red-600' : 'text-green-600'}`}>
-            {isDown ? 'Degraded' : 'Operational'}
-          </p>
+          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${COMPONENT_STATUS_COLOR[cs]}`}>
+            {COMPONENT_STATUS_LABEL[cs]}
+          </span>
           {monitor.last_checked_at && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-1">
               Checked {format.timeAgo(monitor.last_checked_at)}
             </p>
           )}
@@ -254,7 +255,7 @@ export function StatusPage() {
     )
   }
 
-  const downCount    = monitors.filter(m => m.monitor.status === 'down').length
+  const downCount    = monitors.filter(m => m.monitor.component_status && m.monitor.component_status !== 'operational' && m.monitor.component_status !== 'under_maintenance').length
   const allUp        = downCount === 0
   const allIncidents = monitors.flatMap(m => m.incidents ?? [])
   const activeInc    = allIncidents.filter(i => !i.resolved_at)

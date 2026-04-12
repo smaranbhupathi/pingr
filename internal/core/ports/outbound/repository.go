@@ -30,8 +30,17 @@ type MonitorRepository interface {
 	GetByUsername(ctx context.Context, username string) ([]domain.Monitor, error) // for public status page
 	GetDue(ctx context.Context, region string) ([]domain.Monitor, error)          // monitors due for checking
 	Update(ctx context.Context, monitor *domain.Monitor) error
+	UpdateComponentStatus(ctx context.Context, id uuid.UUID, status domain.ComponentStatus) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	CountByUserID(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+type ComponentRepository interface {
+	Create(ctx context.Context, c *domain.Component) error
+	GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Component, error)
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Component, error)
+	Update(ctx context.Context, c *domain.Component) error
+	Delete(ctx context.Context, id, userID uuid.UUID) error
 }
 
 type CheckRepository interface {

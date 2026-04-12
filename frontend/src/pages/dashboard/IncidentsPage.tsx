@@ -6,7 +6,7 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { incidentsApi, type Incident, type IncidentStatus } from '../../api/incidents'
-import { monitorsApi } from '../../api/monitors'
+import { monitorsApi, COMPONENT_STATUS_LABEL, type ComponentStatus } from '../../api/monitors'
 import { STATUS_LABEL, STATUS_COLOR, STATUS_DOT } from '../../lib/incidents'
 import { format } from '../../lib/format'
 import { usePageTitle } from '../../lib/usePageTitle'
@@ -101,7 +101,6 @@ function IncidentRow({ incident }: { incident: Incident }) {
       to={`/dashboard/incidents/${incident.id}`}
       className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
     >
-      {/* Name */}
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{incident.name}</p>
@@ -115,30 +114,69 @@ function IncidentRow({ incident }: { incident: Incident }) {
           <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{latestUpdate.message}</p>
         )}
       </div>
-
-      {/* Status badge */}
       <div>
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[incident.status]}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[incident.status]}`} />
           {STATUS_LABEL[incident.status]}
         </span>
       </div>
-
-      {/* Affected monitors */}
       <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitorNames}</span>
-
-      {/* Time */}
       <span className="text-sm text-gray-400 dark:text-gray-500">
         {incident.resolved_at
           ? `Resolved ${format.timeAgo(incident.resolved_at)}`
           : `Started ${format.timeAgo(incident.created_at)}`}
       </span>
-
-      {/* Chevron */}
       <ChevronRight size={15} className="text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500" />
     </Link>
   )
 }
+
+// ─── Shared select component ──────────────────────────────────────────────────
+
+function SelectField({ label, value, onChange, children }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        {children}
+      </select>
+    </div>
+  )
+}
+
+// ─── Monitor status row (per selected monitor) ────────────────────────────────
+
+function MonitorStatusRow({ monitorName, value, onChange }: {
+  monitorName: string
+  value: ComponentStatus
+  onChange: (v: ComponentStatus) => void
+}) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{monitorName}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as ComponentStatus)}
+        className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+      >
+        {(Object.keys(COMPONENT_STATUS_LABEL) as ComponentStatus[]).map(s => (
+          <option key={s} value={s}>{COMPONENT_STATUS_LABEL[s]}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// ─── Create modal ─────────────────────────────────────────────────────────────
 
 function CreateIncidentModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -147,6 +185,7 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState('')
   const [notify, setNotify] = useState(false)
   const [selectedMonitors, setSelectedMonitors] = useState<string[]>([])
+  const [monitorStatuses, setMonitorStatuses] = useState<Record<string, ComponentStatus>>({})
 
   const { data: monitors = [] } = useQuery({
     queryKey: ['monitors'],
@@ -154,21 +193,40 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
   })
 
   const mutation = useMutation({
-    mutationFn: () => incidentsApi.create({ name, status, message, monitor_ids: selectedMonitors, notify }),
+    mutationFn: () => incidentsApi.create({
+      name, status, message,
+      monitor_ids: selectedMonitors,
+      monitor_statuses: monitorStatuses,
+      notify,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
+      queryClient.invalidateQueries({ queryKey: ['monitors'] })
       onClose()
     },
   })
 
-  const toggleMonitor = (id: string) =>
-    setSelectedMonitors(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id])
+  const toggleMonitor = (id: string) => {
+    setSelectedMonitors(prev => {
+      const next = prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+      // Default status to 'major_outage' when first selected
+      if (!prev.includes(id)) {
+        setMonitorStatuses(s => ({ ...s, [id]: 'major_outage' }))
+      }
+      return next
+    })
+  }
+
+  const setMonitorStatus = (id: string, s: ComponentStatus) =>
+    setMonitorStatuses(prev => ({ ...prev, [id]: s }))
+
+  const selectedMonitorObjects = monitors.filter(m => selectedMonitors.includes(m.id))
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl">
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+      <div className="w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <AlertTriangle size={15} className="text-orange-500" />
             New Incident
@@ -176,7 +234,7 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">×</button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto">
           <Input
             label="Incident name"
             value={name}
@@ -184,18 +242,11 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
             placeholder="e.g. API latency degradation"
           />
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value as IncidentStatus)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {(Object.keys(STATUS_LABEL) as IncidentStatus[]).map(s => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-              ))}
-            </select>
-          </div>
+          <SelectField label="Incident status" value={status} onChange={v => setStatus(v as IncidentStatus)}>
+            {(Object.keys(STATUS_LABEL) as IncidentStatus[]).map(s => (
+              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            ))}
+          </SelectField>
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Message</label>
@@ -203,7 +254,7 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
               value={message}
               onChange={e => setMessage(e.target.value)}
               rows={3}
-              placeholder="Describe what's happening and what you're doing about it…"
+              placeholder="Describe what's happening…"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
@@ -220,9 +271,27 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
                       onChange={() => toggleMonitor(m.id)}
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{m.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate ml-auto">{m.url}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{m.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{m.url}</span>
                   </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Per-monitor status — only shown when monitors are selected */}
+          {selectedMonitorObjects.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Component status</label>
+              <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">Set the status shown on your public status page for each component.</p>
+              <div className="space-y-1.5">
+                {selectedMonitorObjects.map(m => (
+                  <MonitorStatusRow
+                    key={m.id}
+                    monitorName={m.name}
+                    value={monitorStatuses[m.id] ?? 'major_outage'}
+                    onChange={v => setMonitorStatus(m.id, v)}
+                  />
                 ))}
               </div>
             </div>
@@ -239,7 +308,7 @@ function CreateIncidentModal({ onClose }: { onClose: () => void }) {
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!name || !message}>
             Create incident

@@ -452,3 +452,40 @@ func (h *UserHandler) SubscribeMonitorToChannel(w http.ResponseWriter, r *http.R
 	)
 	JSON(w, http.StatusCreated, map[string]string{"message": "subscribed"})
 }
+
+func (h *UserHandler) UpdateMonitorMeta(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid monitor id")
+		return
+	}
+	var body struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		ComponentID *string `json:"component_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	var componentID *uuid.UUID
+	if body.ComponentID != nil && *body.ComponentID != "" {
+		parsed, err := uuid.Parse(*body.ComponentID)
+		if err != nil {
+			Error(w, http.StatusBadRequest, "invalid component_id")
+			return
+		}
+		componentID = &parsed
+	}
+	monitor, err := h.users.UpdateMonitorMeta(r.Context(), id, userID, body.Name, body.Description, componentID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "failed to update monitor")
+		return
+	}
+	JSON(w, http.StatusOK, monitor)
+}

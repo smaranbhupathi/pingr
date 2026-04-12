@@ -60,20 +60,33 @@ func (i CreateAlertChannelInput) Validate() map[string]string {
 }
 
 type CreateIncidentInput struct {
-	UserID     uuid.UUID
-	Name       string
-	Status     domain.IncidentStatus
-	Message    string
-	MonitorIDs []uuid.UUID
-	Notify     bool
+	UserID           uuid.UUID
+	Name             string
+	Status           domain.IncidentStatus
+	Message          string
+	MonitorIDs       []uuid.UUID
+	MonitorStatuses  map[uuid.UUID]domain.ComponentStatus // optional: set component_status per monitor
+	Notify           bool
 }
 
 type PostIncidentUpdateInput struct {
-	IncidentID uuid.UUID
-	UserID     uuid.UUID
-	Status     domain.IncidentStatus
-	Message    string
-	Notify     bool
+	IncidentID      uuid.UUID
+	UserID          uuid.UUID
+	Status          domain.IncidentStatus
+	Message         string
+	MonitorStatuses map[uuid.UUID]domain.ComponentStatus // optional: set component_status per monitor
+	Notify          bool
+}
+
+type CreateComponentInput struct {
+	UserID      uuid.UUID
+	Name        string
+	Description string
+}
+
+type UpdateComponentInput struct {
+	Name        *string
+	Description *string
 }
 
 type UserService interface {
@@ -98,4 +111,13 @@ type UserService interface {
 	GetIncident(ctx context.Context, id, userID uuid.UUID) (*domain.Incident, error)
 	ListIncidents(ctx context.Context, userID uuid.UUID) ([]domain.Incident, error)
 	PostIncidentUpdate(ctx context.Context, input PostIncidentUpdateInput) (*domain.Incident, error)
+
+	// Components
+	CreateComponent(ctx context.Context, input CreateComponentInput) (*domain.Component, error)
+	ListComponents(ctx context.Context, userID uuid.UUID) ([]domain.Component, error)
+	UpdateComponent(ctx context.Context, id, userID uuid.UUID, input UpdateComponentInput) (*domain.Component, error)
+	DeleteComponent(ctx context.Context, id, userID uuid.UUID) error
+
+	// Monitor edits
+	UpdateMonitorMeta(ctx context.Context, id, userID uuid.UUID, name, description string, componentID *uuid.UUID) (*domain.Monitor, error)
 }

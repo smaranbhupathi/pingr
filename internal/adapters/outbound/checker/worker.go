@@ -175,6 +175,11 @@ func (w *Worker) checkMonitor(ctx context.Context, monitor domain.Monitor) {
 
 func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, previousStatus domain.MonitorStatus, isUp bool, now time.Time) {
 	if !isUp && previousStatus != domain.MonitorStatusDown {
+		// Set component status to major_outage on the public status page.
+		if err := w.monitors.UpdateComponentStatus(ctx, monitor.ID, domain.ComponentStatusMajorOutage); err != nil {
+			slog.Error("update component status failed", "monitor_id", monitor.ID, "error", err)
+		}
+
 		// Create internal outage event (uptime math + alert triggering).
 		outageEvent := &domain.OutageEvent{
 			ID:        uuid.New(),
@@ -201,6 +206,11 @@ func (w *Worker) handleIncident(ctx context.Context, monitor domain.Monitor, pre
 	}
 
 	if isUp && previousStatus == domain.MonitorStatusDown {
+		// Restore component status to operational on recovery.
+		if err := w.monitors.UpdateComponentStatus(ctx, monitor.ID, domain.ComponentStatusOperational); err != nil {
+			slog.Error("update component status failed", "monitor_id", monitor.ID, "error", err)
+		}
+
 		outageEvent, err := w.outageEvents.GetOpenByMonitorID(ctx, monitor.ID)
 		if err != nil {
 			return

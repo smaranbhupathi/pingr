@@ -22,21 +22,21 @@ func NewMonitorRepository(db *pgxpool.Pool) outbound.MonitorRepository {
 func (r *monitorRepo) Create(ctx context.Context, m *domain.Monitor) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO monitors
-			(id, user_id, name, url, type, interval_seconds, timeout_seconds,
-			 failure_threshold, region, is_active, status, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		m.ID, m.UserID, m.Name, m.URL, m.Type, m.IntervalSeconds, m.TimeoutSeconds,
-		m.FailureThreshold, m.Region, m.IsActive, m.Status, m.CreatedAt, m.UpdatedAt,
+			(id, user_id, name, description, url, type, interval_seconds, timeout_seconds,
+			 failure_threshold, region, is_active, status, component_status, component_id, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		m.ID, m.UserID, m.Name, m.Description, m.URL, m.Type, m.IntervalSeconds, m.TimeoutSeconds,
+		m.FailureThreshold, m.Region, m.IsActive, m.Status, m.ComponentStatus, m.ComponentID, m.CreatedAt, m.UpdatedAt,
 	)
 	return err
 }
 
 func (r *monitorRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Monitor, error) {
-	return r.scanOne(r.db.QueryRow(ctx, `SELECT `+monitorCols+` FROM monitors WHERE id=$1 AND deleted_at IS NULL`, id))
+	return r.scanOne(r.db.QueryRow(ctx, `SELECT `+monitorCols+` FROM monitors m WHERE m.id=$1 AND m.deleted_at IS NULL`, id))
 }
 
 func (r *monitorRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Monitor, error) {
-	rows, err := r.db.Query(ctx, `SELECT `+monitorCols+` FROM monitors WHERE user_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC`, userID)
+	rows, err := r.db.Query(ctx, `SELECT `+monitorCols+` FROM monitors m WHERE m.user_id=$1 AND m.deleted_at IS NULL ORDER BY m.created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,7 @@ func (r *monitorRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]doma
 
 func (r *monitorRepo) GetByUsername(ctx context.Context, username string) ([]domain.Monitor, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT m.id, m.user_id, m.name, m.url, m.type, m.interval_seconds, m.timeout_seconds,
-			m.failure_threshold, m.region, m.is_active, m.status, m.last_checked_at, m.created_at, m.updated_at
+		SELECT `+monitorCols+`
 		FROM monitors m
 		JOIN users u ON u.id = m.user_id
 		WHERE u.username=$1 AND m.is_active=true AND m.deleted_at IS NULL
@@ -62,15 +61,15 @@ func (r *monitorRepo) GetByUsername(ctx context.Context, username string) ([]dom
 // Uses interval arithmetic so the scheduler just calls this in a tight loop.
 func (r *monitorRepo) GetDue(ctx context.Context, region string) ([]domain.Monitor, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT `+monitorCols+` FROM monitors
-		WHERE is_active = true
-		  AND deleted_at IS NULL
-		  AND region = $1
+		SELECT `+monitorCols+` FROM monitors m
+		WHERE m.is_active = true
+		  AND m.deleted_at IS NULL
+		  AND m.region = $1
 		  AND (
-		    last_checked_at IS NULL
-		    OR last_checked_at <= NOW() - (interval_seconds || ' seconds')::interval
+		    m.last_checked_at IS NULL
+		    OR m.last_checked_at <= NOW() - (m.interval_seconds || ' seconds')::interval
 		  )
-		ORDER BY last_checked_at ASC NULLS FIRST
+		ORDER BY m.last_checked_at ASC NULLS FIRST
 		LIMIT 100`, region,
 	)
 	if err != nil {
@@ -82,12 +81,21 @@ func (r *monitorRepo) GetDue(ctx context.Context, region string) ([]domain.Monit
 func (r *monitorRepo) Update(ctx context.Context, m *domain.Monitor) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE monitors SET
-			name=$2, url=$3, interval_seconds=$4, timeout_seconds=$5,
-			failure_threshold=$6, is_active=$7, status=$8,
-			last_checked_at=$9, updated_at=$10
+			name=$2, description=$3, url=$4, interval_seconds=$5, timeout_seconds=$6,
+			failure_threshold=$7, is_active=$8, status=$9, component_status=$10,
+			component_id=$11, last_checked_at=$12, updated_at=$13
 		WHERE id=$1`,
-		m.ID, m.Name, m.URL, m.IntervalSeconds, m.TimeoutSeconds,
-		m.FailureThreshold, m.IsActive, m.Status, m.LastCheckedAt, m.UpdatedAt,
+		m.ID, m.Name, m.Description, m.URL, m.IntervalSeconds, m.TimeoutSeconds,
+		m.FailureThreshold, m.IsActive, m.Status, m.ComponentStatus,
+		m.ComponentID, m.LastCheckedAt, m.UpdatedAt,
+	)
+	return err
+}
+
+func (r *monitorRepo) UpdateComponentStatus(ctx context.Context, id uuid.UUID, status domain.ComponentStatus) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE monitors SET component_status=$2, updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`,
+		id, status,
 	)
 	return err
 }
@@ -103,14 +111,15 @@ func (r *monitorRepo) CountByUserID(ctx context.Context, userID uuid.UUID) (int,
 	return count, err
 }
 
-const monitorCols = `id, user_id, name, url, type, interval_seconds, timeout_seconds,
-	failure_threshold, region, is_active, status, last_checked_at, created_at, updated_at`
+const monitorCols = `m.id, m.user_id, m.name, m.description, m.url, m.type, m.interval_seconds, m.timeout_seconds,
+	m.failure_threshold, m.region, m.is_active, m.status, m.component_status, m.component_id, m.last_checked_at, m.created_at, m.updated_at`
 
 func (r *monitorRepo) scanOne(row pgx.Row) (*domain.Monitor, error) {
 	var m domain.Monitor
 	err := row.Scan(
-		&m.ID, &m.UserID, &m.Name, &m.URL, &m.Type, &m.IntervalSeconds, &m.TimeoutSeconds,
-		&m.FailureThreshold, &m.Region, &m.IsActive, &m.Status, &m.LastCheckedAt, &m.CreatedAt, &m.UpdatedAt,
+		&m.ID, &m.UserID, &m.Name, &m.Description, &m.URL, &m.Type, &m.IntervalSeconds, &m.TimeoutSeconds,
+		&m.FailureThreshold, &m.Region, &m.IsActive, &m.Status, &m.ComponentStatus, &m.ComponentID,
+		&m.LastCheckedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("monitor scan: %w", err)

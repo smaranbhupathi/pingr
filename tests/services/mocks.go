@@ -189,6 +189,13 @@ func (m *mockMonitorRepo) CountByUserID(ctx context.Context, userID uuid.UUID) (
 	return count, nil
 }
 
+func (m *mockMonitorRepo) UpdateComponentStatus(ctx context.Context, id uuid.UUID, status domain.ComponentStatus) error {
+	if mon, ok := m.monitors[id]; ok {
+		mon.ComponentStatus = status
+	}
+	return nil
+}
+
 // ── Check repository ──────────────────────────────────────────────────────────
 
 type mockCheckRepo struct{}
@@ -237,6 +244,49 @@ func (m *mockIncidentRepo) GetByOutageEventID(ctx context.Context, outageEventID
 	return nil, errNotFound
 }
 func (m *mockIncidentRepo) Resolve(ctx context.Context, incidentID uuid.UUID) error {
+	return nil
+}
+
+// ── Component repository ──────────────────────────────────────────────────────
+
+type mockComponentRepo struct {
+	components map[uuid.UUID]*domain.Component
+}
+
+func newMockComponentRepo() *mockComponentRepo {
+	return &mockComponentRepo{components: make(map[uuid.UUID]*domain.Component)}
+}
+
+func (m *mockComponentRepo) Create(ctx context.Context, c *domain.Component) error {
+	m.components[c.ID] = c
+	return nil
+}
+
+func (m *mockComponentRepo) GetByID(ctx context.Context, id, userID uuid.UUID) (*domain.Component, error) {
+	c, ok := m.components[id]
+	if !ok || c.UserID != userID {
+		return nil, errNotFound
+	}
+	return c, nil
+}
+
+func (m *mockComponentRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.Component, error) {
+	var result []domain.Component
+	for _, c := range m.components {
+		if c.UserID == userID {
+			result = append(result, *c)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockComponentRepo) Update(ctx context.Context, c *domain.Component) error {
+	m.components[c.ID] = c
+	return nil
+}
+
+func (m *mockComponentRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
+	delete(m.components, id)
 	return nil
 }
 

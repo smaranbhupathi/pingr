@@ -6,6 +6,7 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { incidentsApi, type IncidentStatus } from '../../api/incidents'
+import { COMPONENT_STATUS_LABEL, type ComponentStatus } from '../../api/monitors'
 import { STATUS_LABEL, STATUS_COLOR, STATUS_DOT } from '../../lib/incidents'
 import { format } from '../../lib/format'
 import { usePageTitle } from '../../lib/usePageTitle'
@@ -23,14 +24,22 @@ export function IncidentDetailPage() {
   const [updateStatus, setUpdateStatus] = useState<IncidentStatus>('investigating')
   const [updateMessage, setUpdateMessage] = useState('')
   const [notify, setNotify] = useState(false)
+  const [monitorStatuses, setMonitorStatuses] = useState<Record<string, ComponentStatus>>({})
 
   const postUpdate = useMutation({
-    mutationFn: () => incidentsApi.postUpdate(id!, { status: updateStatus, message: updateMessage, notify }),
+    mutationFn: () => incidentsApi.postUpdate(id!, {
+      status: updateStatus,
+      message: updateMessage,
+      monitor_statuses: monitorStatuses,
+      notify,
+    }),
     onSuccess: () => {
       setUpdateMessage('')
       setNotify(false)
+      setMonitorStatuses({})
       queryClient.invalidateQueries({ queryKey: ['incidents', id] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
+      queryClient.invalidateQueries({ queryKey: ['monitors'] })
     },
   })
 
@@ -125,6 +134,30 @@ export function IncidentDetailPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
               </div>
+              {/* Per-monitor component status */}
+              {incident.monitors && incident.monitors.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Component status</label>
+                  <div className="space-y-1.5">
+                    {incident.monitors.map(m => (
+                      <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{m.name}</span>
+                        <select
+                          value={monitorStatuses[m.id] ?? ''}
+                          onChange={e => setMonitorStatuses(prev => ({ ...prev, [m.id]: e.target.value as ComponentStatus }))}
+                          className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">— no change —</option>
+                          {(Object.keys(COMPONENT_STATUS_LABEL) as ComponentStatus[]).map(s => (
+                            <option key={s} value={s}>{COMPONENT_STATUS_LABEL[s]}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
