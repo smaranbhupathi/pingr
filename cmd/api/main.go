@@ -106,11 +106,18 @@ func main() {
 		AppBaseURL:           mustEnv("APP_BASE_URL"),
 	})
 	monitorSvc := services.NewMonitorService(monitorRepo, checkRepo, incidentRepo, userRepo, planRepo)
-	webhookNotifiers := []outbound.Notifier{
+	var emailNotifier outbound.Notifier
+	if resendKey := os.Getenv("RESEND_API_KEY"); resendKey != "" {
+		emailNotifier = email.NewNotifier(resendKey, mustEnv("FROM_EMAIL"))
+	} else {
+		emailNotifier = email.NewConsoleNotifier()
+	}
+	allNotifiers := []outbound.Notifier{
+		emailNotifier,
 		webhook.NewSlackNotifier(),
 		webhook.NewDiscordNotifier(),
 	}
-	userSvc := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, incidentRepo, emailSender, storageSvc, webhookNotifiers)
+	userSvc := services.NewUserService(userRepo, planRepo, alertChannelRepo, alertSubRepo, monitorRepo, incidentRepo, emailSender, storageSvc, allNotifiers)
 
 	// HTTP handlers
 	authH     := handler.NewAuthHandler(authSvc, log)
