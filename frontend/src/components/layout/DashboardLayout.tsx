@@ -23,7 +23,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
-      <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/50 flex flex-col shrink-0">
+      <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/50 flex flex-col shrink-0 sticky top-0 h-screen overflow-y-auto">
         {/* Brand */}
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50">
           <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Pingr</Link>
@@ -67,9 +67,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Right side */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top header */}
-        <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 flex items-center justify-end shrink-0">
+        <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 flex items-center justify-end shrink-0 sticky top-0 z-10">
           <UserMenu />
         </header>
 
