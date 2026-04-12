@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -309,6 +310,16 @@ func (s *userService) CreateIncident(ctx context.Context, input inbound.CreateIn
 	}
 	inc.Updates = []domain.IncidentUpdate{*update}
 
+	if input.Notify {
+		// Re-fetch so Monitors (name/URL) are populated for the notification body.
+		full, err := s.incidents.GetByID(ctx, inc.ID, input.UserID)
+		if err != nil {
+			slog.Error("fanout: failed to re-fetch incident for notification", "incident_id", inc.ID, "error", err)
+		} else {
+			s.fanoutIncidentUpdate(ctx, *full, *update)
+		}
+	}
+
 	return inc, nil
 }
 
@@ -369,26 +380,42 @@ func (s *userService) PostIncidentUpdate(ctx context.Context, input inbound.Post
 // to any monitor affected by this incident. Channels are deduplicated — if the same
 // Slack webhook is subscribed to two affected monitors, it only gets one message.
 func (s *userService) fanoutIncidentUpdate(ctx context.Context, incident domain.Incident, update domain.IncidentUpdate) {
+	if len(incident.MonitorIDs) == 0 {
+		slog.Warn("fanout: incident has no affected monitors, skipping notification", "incident_id", incident.ID)
+		return
+	}
+
 	seen := make(map[uuid.UUID]bool)
 
 	for _, monitorID := range incident.MonitorIDs {
 		channels, err := s.alertChannels.GetByMonitorID(ctx, monitorID)
 		if err != nil {
+			slog.Error("fanout: get channels failed", "incident_id", incident.ID, "monitor_id", monitorID, "error", err)
+			continue
+		}
+		if len(channels) == 0 {
+			slog.Warn("fanout: no subscribed channels for monitor", "incident_id", incident.ID, "monitor_id", monitorID)
 			continue
 		}
 		for _, ch := range channels {
-			if seen[ch.ID] || !ch.IsEnabled {
+			if seen[ch.ID] {
+				continue
+			}
+			if !ch.IsEnabled {
+				slog.Debug("fanout: channel disabled, skipping", "channel_id", ch.ID, "type", ch.Type)
 				continue
 			}
 			seen[ch.ID] = true
 
 			notifier, ok := s.notifiers[ch.Type]
 			if !ok {
+				slog.Warn("fanout: no notifier registered for channel type", "type", ch.Type, "channel_id", ch.ID)
 				continue
 			}
 			if err := notifier.SendIncidentUpdate(ctx, incident, update, ch.Config); err != nil {
-				// Log but don't fail — one bad channel shouldn't block the others.
-				_ = err
+				slog.Error("fanout: send failed", "channel_id", ch.ID, "type", ch.Type, "incident_id", incident.ID, "error", err)
+			} else {
+				slog.Info("fanout: notification sent", "channel_id", ch.ID, "type", ch.Type, "incident_id", incident.ID)
 			}
 		}
 	}
