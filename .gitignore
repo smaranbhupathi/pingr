@@ -19,6 +19,9 @@ frontend/.env.*
 *.pgsql
 *.sql.bak
 
+# Personal dev notes — kept local only, never committed (may contain credentials)
+DEV_NOTES.md
+
 # Compiled binaries sitting in root (from go build without -o)
 /api
 /worker
