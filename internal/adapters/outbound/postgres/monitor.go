@@ -116,13 +116,17 @@ const monitorCols = `m.id, m.user_id, m.name, m.description, m.url, m.type, m.in
 
 func (r *monitorRepo) scanOne(row pgx.Row) (*domain.Monitor, error) {
 	var m domain.Monitor
+	var desc *string
 	err := row.Scan(
-		&m.ID, &m.UserID, &m.Name, &m.Description, &m.URL, &m.Type, &m.IntervalSeconds, &m.TimeoutSeconds,
+		&m.ID, &m.UserID, &m.Name, &desc, &m.URL, &m.Type, &m.IntervalSeconds, &m.TimeoutSeconds,
 		&m.FailureThreshold, &m.Region, &m.IsActive, &m.Status, &m.ComponentStatus, &m.ComponentID,
 		&m.LastCheckedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("monitor scan: %w", err)
+	}
+	if desc != nil {
+		m.Description = *desc
 	}
 	return &m, nil
 }
