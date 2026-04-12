@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userApi } from '../../api/user'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Bell, ChevronRight, Trash2 } from 'lucide-react'
+import { Bell, ChevronRight, Trash2, Upload, Download } from 'lucide-react'
+import { ImportExportModal } from './ImportExportModal'
 
 type ChannelType = 'email' | 'slack' | 'discord'
 
@@ -59,6 +60,7 @@ export function AlertChannelsSection() {
   const [name, setName] = useState('')
   const [value, setValue] = useState('')
   const [err, setErr] = useState('')
+  const [importExportTab, setImportExportTab] = useState<'import' | 'export' | null>(null)
 
   const { data: channels = [] } = useQuery({
     queryKey: ['alert-channels'],
@@ -105,9 +107,23 @@ export function AlertChannelsSection() {
             </p>
           )}
         </div>
-        <Button onClick={() => { setShowForm(s => !s); setErr('') }}>
-          + Add channel
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportExportTab('import')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <Upload size={14} /> Import
+          </button>
+          <button
+            onClick={() => setImportExportTab('export')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <Download size={14} /> Export
+          </button>
+          <Button onClick={() => { setShowForm(s => !s); setErr('') }}>
+            + Add channel
+          </Button>
+        </div>
       </div>
 
       {/* Add channel form */}
@@ -231,6 +247,14 @@ export function AlertChannelsSection() {
             ))}
           </div>
         </div>
+      )}
+
+      {importExportTab && (
+        <ImportExportModal
+          channels={channels}
+          defaultTab={importExportTab}
+          onClose={() => setImportExportTab(null)}
+        />
       )}
     </div>
   )

@@ -489,3 +489,42 @@ func (h *UserHandler) UpdateMonitorMeta(w http.ResponseWriter, r *http.Request) 
 	}
 	JSON(w, http.StatusOK, monitor)
 }
+
+// ── Import alert channels ─────────────────────────────────────────────────────
+
+func (h *UserHandler) ImportAlertChannels(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var body struct {
+		Channels   []inbound.ImportChannelRow `json:"channels"`
+		OnConflict string                     `json:"on_conflict"` // "skip" | "overwrite"
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(body.Channels) == 0 {
+		Error(w, http.StatusBadRequest, "no channels provided")
+		return
+	}
+	if len(body.Channels) > 500 {
+		Error(w, http.StatusBadRequest, "too many channels (max 500 per import)")
+		return
+	}
+	if body.OnConflict != "skip" && body.OnConflict != "overwrite" {
+		body.OnConflict = "skip"
+	}
+
+	result, err := h.users.ImportAlertChannels(r.Context(), userID, body.Channels, body.OnConflict)
+	if err != nil {
+		h.log.ErrorContext(r.Context(), "import alert channels failed", "user_id", userID, "error", err)
+		Error(w, http.StatusInternalServerError, "import failed")
+		return
+	}
+
+	JSON(w, http.StatusOK, result)
+}

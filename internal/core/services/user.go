@@ -487,6 +487,108 @@ func (s *userService) DeleteComponent(ctx context.Context, id, userID uuid.UUID)
 	return s.components.Delete(ctx, id, userID)
 }
 
+// ── Import / Export ───────────────────────────────────────────────────────────
+
+func (s *userService) ImportAlertChannels(ctx context.Context, userID uuid.UUID, rows []inbound.ImportChannelRow, onConflict string) (*inbound.ImportResult, error) {
+	existing, err := s.alertChannels.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("load existing channels: %w", err)
+	}
+
+	// Build conflict lookup: "type:value" → existing channel
+	lookup := make(map[string]*domain.AlertChannel, len(existing))
+	for i := range existing {
+		ch := &existing[i]
+		lookup[importConflictKey(ch.Type, ch.Config)] = ch
+	}
+
+	result := &inbound.ImportResult{Errors: []inbound.ImportError{}}
+
+	for i, row := range rows {
+		rowNum := i + 1
+
+		if err := validateImportRow(row); err != nil {
+			result.Errors = append(result.Errors, inbound.ImportError{Row: rowNum, Name: row.Name, Reason: err.Error()})
+			continue
+		}
+
+		key := string(row.Type) + ":" + row.Value
+		conflicting, hasConflict := lookup[key]
+
+		if hasConflict {
+			if onConflict == "skip" {
+				result.Skipped++
+				continue
+			}
+			// overwrite: update name + enabled on the existing channel
+			if err := s.alertChannels.UpdateName(ctx, conflicting.ID, userID, row.Name); err != nil {
+				result.Errors = append(result.Errors, inbound.ImportError{Row: rowNum, Name: row.Name, Reason: "failed to update name"})
+				continue
+			}
+			if err := s.alertChannels.UpdateEnabled(ctx, conflicting.ID, userID, row.Enabled); err != nil {
+				result.Errors = append(result.Errors, inbound.ImportError{Row: rowNum, Name: row.Name, Reason: "failed to update enabled"})
+				continue
+			}
+			result.Overwritten++
+			continue
+		}
+
+		config := make(map[string]any)
+		if row.Type == domain.AlertChannelEmail {
+			config["email"] = row.Value
+		} else {
+			config["webhook_url"] = row.Value
+		}
+
+		ch := &domain.AlertChannel{
+			ID:        uuid.New(),
+			UserID:    userID,
+			Name:      row.Name,
+			Type:      row.Type,
+			Config:    config,
+			IsDefault: false,
+			IsEnabled: row.Enabled,
+			CreatedAt: time.Now(),
+		}
+		if err := s.alertChannels.Create(ctx, ch); err != nil {
+			result.Errors = append(result.Errors, inbound.ImportError{Row: rowNum, Name: row.Name, Reason: "failed to save"})
+			continue
+		}
+		result.Imported++
+	}
+
+	return result, nil
+}
+
+func importConflictKey(t domain.AlertChannelType, config map[string]any) string {
+	var val string
+	if t == domain.AlertChannelEmail {
+		val, _ = config["email"].(string)
+	} else {
+		val, _ = config["webhook_url"].(string)
+	}
+	return string(t) + ":" + val
+}
+
+func validateImportRow(row inbound.ImportChannelRow) error {
+	if row.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	switch row.Type {
+	case domain.AlertChannelEmail:
+		if row.Value == "" || !strings.Contains(row.Value, "@") {
+			return fmt.Errorf("invalid email address")
+		}
+	case domain.AlertChannelSlack, domain.AlertChannelDiscord:
+		if row.Value == "" || !strings.HasPrefix(row.Value, "https://") {
+			return fmt.Errorf("invalid webhook URL")
+		}
+	default:
+		return fmt.Errorf("unsupported type %q — must be email, slack, or discord", row.Type)
+	}
+	return nil
+}
+
 // ── Monitor meta ──────────────────────────────────────────────────────────────
 
 func (s *userService) UpdateMonitorMeta(ctx context.Context, id, userID uuid.UUID, name, description string, componentID *uuid.UUID) (*domain.Monitor, error) {

@@ -61,4 +61,27 @@ export const userApi = {
 
   listMonitorSubscriptions: (monitorId: string) =>
     client.get<AlertChannel[]>(`/monitors/${monitorId}/subscriptions`),
+
+  importAlertChannels: (channels: ImportChannelRow[], onConflict: 'skip' | 'overwrite') =>
+    client.post<ImportResult>('/alert-channels/import', { channels, on_conflict: onConflict }),
+}
+
+export interface ImportChannelRow {
+  name: string
+  type: string
+  value: string
+  enabled: boolean
+}
+
+export interface ImportError {
+  row: number
+  name: string
+  reason: string
+}
+
+export interface ImportResult {
+  imported: number
+  skipped: number
+  overwritten: number
+  errors: ImportError[]
 }

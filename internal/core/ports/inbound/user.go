@@ -84,6 +84,27 @@ type CreateComponentInput struct {
 	Description string
 }
 
+// ImportChannelRow is one row from a JSON or CSV import file.
+type ImportChannelRow struct {
+	Name    string                  `json:"name"`
+	Type    domain.AlertChannelType `json:"type"`
+	Value   string                  `json:"value"`   // email addr OR webhook URL
+	Enabled bool                    `json:"enabled"`
+}
+
+type ImportError struct {
+	Row    int    `json:"row"`
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+type ImportResult struct {
+	Imported    int           `json:"imported"`
+	Skipped     int           `json:"skipped"`
+	Overwritten int           `json:"overwritten"`
+	Errors      []ImportError `json:"errors"`
+}
+
 type UpdateComponentInput struct {
 	Name        *string
 	Description *string
@@ -120,4 +141,7 @@ type UserService interface {
 
 	// Monitor edits
 	UpdateMonitorMeta(ctx context.Context, id, userID uuid.UUID, name, description string, componentID *uuid.UUID) (*domain.Monitor, error)
+
+	// Import / export
+	ImportAlertChannels(ctx context.Context, userID uuid.UUID, rows []ImportChannelRow, onConflict string) (*ImportResult, error)
 }

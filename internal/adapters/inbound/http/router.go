@@ -66,6 +66,7 @@ func NewRouter(
 		r.Route("/alert-channels", func(r chi.Router) {
 			r.Get("/", userH.ListAlertChannels)
 			r.Post("/", userH.CreateAlertChannel)
+			r.Post("/import", userH.ImportAlertChannels)
 			r.Get("/{id}", userH.GetAlertChannel)
 			r.Patch("/{id}", userH.UpdateAlertChannel)
 			r.Delete("/{id}", userH.DeleteAlertChannel)
