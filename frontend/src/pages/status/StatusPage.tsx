@@ -243,7 +243,20 @@ export function StatusPage({ slugOverride }: { slugOverride?: string }) {
   if (isLoading) {
     return (
       <StatusShell username={slug}>
-        <p className="text-gray-400 text-center py-16">Loading…</p>
+        {/* Banner skeleton */}
+        <div className="rounded-xl p-5 mb-8 bg-gray-100 dark:bg-gray-800 animate-pulse h-16" />
+        {/* Component skeletons */}
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-700 p-5 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+                <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+              </div>
+              <div className="h-8 bg-gray-100 dark:bg-gray-800 rounded w-full" />
+            </div>
+          ))}
+        </div>
       </StatusShell>
     )
   }
@@ -273,7 +286,7 @@ export function StatusPage({ slugOverride }: { slugOverride?: string }) {
   const resolvedDeduped = deduped(resolvedInc)
 
   return (
-    <StatusShell username={username!}>
+    <StatusShell username={slug}>
       {/* ── Overall banner ── */}
       <div className={`rounded-xl p-5 mb-8 flex items-center gap-4 ${
         allUp
