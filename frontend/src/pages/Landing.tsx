@@ -245,7 +245,16 @@ function GuestHome() {
               <p className="text-4xl font-bold text-gray-900 mb-1">₹0</p>
               <p className="text-sm text-gray-400 mb-6">Forever</p>
               <ul className="space-y-3 text-sm text-gray-600">
-                {['5 monitors', '1-minute checks', 'Email alerts', 'Public status page', '90-day history'].map(f => (
+                {[
+                  '5 monitors',
+                  '30s – 24h check intervals',
+                  'Email, Slack & Discord alerts',
+                  'Public status page (yourname.getpingr.com)',
+                  'Incident management',
+                  'Component groups',
+                  '90-day uptime history',
+                  'Import / export alert channels',
+                ].map(f => (
                   <li key={f} className="flex items-center gap-2">
                     <span className="text-green-500">✓</span> {f}
                   </li>
@@ -261,7 +270,17 @@ function GuestHome() {
               <p className="text-4xl font-bold mb-1">₹299</p>
               <p className="text-sm text-indigo-200 mb-6">/month · Coming soon</p>
               <ul className="space-y-3 text-sm text-indigo-100">
-                {['50 monitors', '30-second checks', 'Slack + Discord alerts', 'Custom domain status page', 'SSL monitoring', 'Multi-region checks'].map(f => (
+                {[
+                  '50 monitors',
+                  '30-second checks',
+                  'Microsoft Teams alerts',
+                  'PagerDuty & webhook integrations',
+                  'Custom domain status page',
+                  'SSL certificate monitoring',
+                  'Multi-region checks',
+                  'API access',
+                  'Priority support',
+                ].map(f => (
                   <li key={f} className="flex items-center gap-2">
                     <span className="text-indigo-300">✓</span> {f}
                   </li>
