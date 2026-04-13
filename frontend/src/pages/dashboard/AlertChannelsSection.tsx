@@ -85,7 +85,18 @@ export function AlertChannelsSection() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       userApi.toggleAlertChannel(id, enabled),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-channels'] }),
+    onMutate: async ({ id, enabled }) => {
+      await queryClient.cancelQueries({ queryKey: ['alert-channels'] })
+      const previous = queryClient.getQueryData(['alert-channels'])
+      queryClient.setQueryData(['alert-channels'], (old: any) =>
+        old?.map((ch: any) => ch.id === id ? { ...ch, is_enabled: enabled } : ch)
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context: any) => {
+      queryClient.setQueryData(['alert-channels'], context?.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['alert-channels'] }),
   })
 
   const deleteMutation = useMutation({
