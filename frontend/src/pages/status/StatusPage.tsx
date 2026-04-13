@@ -230,18 +230,19 @@ function StatusShell({ username, children }: { username: string; children: React
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export function StatusPage() {
+export function StatusPage({ slugOverride }: { slugOverride?: string }) {
   const { username } = useParams<{ username: string }>()
+  const slug = slugOverride ?? username ?? ''
 
   const { data: monitors = [], isLoading, isError } = useQuery({
-    queryKey: ['status', username],
-    queryFn: () => monitorsApi.statusPage(username!).then(r => r.data ?? []),
+    queryKey: ['status', slug],
+    queryFn: () => monitorsApi.statusPage(slug).then(r => r.data ?? []),
     refetchInterval: 60_000,
   })
 
   if (isLoading) {
     return (
-      <StatusShell username={username!}>
+      <StatusShell username={slug}>
         <p className="text-gray-400 text-center py-16">Loading…</p>
       </StatusShell>
     )
@@ -249,7 +250,7 @@ export function StatusPage() {
 
   if (isError) {
     return (
-      <StatusShell username={username!}>
+      <StatusShell username={slug}>
         <p className="text-red-400 text-center py-16">Failed to load status page.</p>
       </StatusShell>
     )

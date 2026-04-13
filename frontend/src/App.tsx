@@ -35,7 +35,32 @@ function RequireGuest({ children }: { children: React.ReactNode }) {
   return !isLoggedIn() ? <>{children}</> : <Navigate to="/dashboard" replace />
 }
 
+// If the app is loaded on a *.getpingr.com subdomain (e.g. acme-corp.getpingr.com),
+// render the status page for that slug directly — React Router sees "/" so we
+// intercept before routing kicks in.
+function SubdomainStatusPage() {
+  const host = window.location.hostname // e.g. "acme-corp.getpingr.com"
+  const slug = host.replace('.getpingr.com', '')
+  return <StatusPage slugOverride={slug} />
+}
+
+const ROOT_DOMAIN = 'getpingr.com'
+const isSubdomain = (
+  window.location.hostname.endsWith(`.${ROOT_DOMAIN}`) &&
+  window.location.hostname !== `www.${ROOT_DOMAIN}`
+)
+
 export default function App() {
+  if (isSubdomain) {
+    return (
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <SubdomainStatusPage />
+        </QueryClientProvider>
+      </ThemeProvider>
+    )
+  }
+
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
