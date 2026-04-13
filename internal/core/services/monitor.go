@@ -165,9 +165,13 @@ func (s *monitorService) GetResponseTimeGraph(ctx context.Context, monitorID uui
 }
 
 func (s *monitorService) GetStatusPage(ctx context.Context, username string) ([]inbound.MonitorDetail, error) {
-	monitors, err := s.monitors.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
+	// Try slug lookup first; fall back to username for backwards compatibility
+	monitors, err := s.monitors.GetBySlug(ctx, username)
+	if err != nil || len(monitors) == 0 {
+		monitors, err = s.monitors.GetByUsername(ctx, username)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	details := make([]inbound.MonitorDetail, 0, len(monitors))

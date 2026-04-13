@@ -490,6 +490,35 @@ func (h *UserHandler) UpdateMonitorMeta(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, monitor)
 }
 
+// ── Status page slug ──────────────────────────────────────────────────────────
+
+func (h *UserHandler) SetSlug(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var body struct {
+		Slug string `json:"slug"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Slug == "" {
+		Error(w, http.StatusBadRequest, "slug is required")
+		return
+	}
+
+	if err := h.users.SetStatusPageSlug(r.Context(), userID, body.Slug); err != nil {
+		if errors.Is(err, services.ErrSlugTaken) {
+			Error(w, http.StatusConflict, "this URL is already taken")
+			return
+		}
+		Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Import alert channels ─────────────────────────────────────────────────────
 
 func (h *UserHandler) ImportAlertChannels(w http.ResponseWriter, r *http.Request) {

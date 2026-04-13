@@ -61,6 +61,25 @@ func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*dom
 	return nil, errNotFound
 }
 
+func (m *mockUserRepo) GetBySlug(ctx context.Context, slug string) (*domain.User, error) {
+	for _, u := range m.users {
+		if u.StatusPageSlug != nil && *u.StatusPageSlug == slug {
+			return u, nil
+		}
+	}
+	return nil, errNotFound
+}
+
+func (m *mockUserRepo) SetSlug(ctx context.Context, userID uuid.UUID, slug string) error {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.StatusPageSlug = &slug
+			return nil
+		}
+	}
+	return errNotFound
+}
+
 func (m *mockUserRepo) GetByVerifyToken(ctx context.Context, token string) (*domain.User, error) {
 	for _, u := range m.users {
 		if u.VerifyToken == token {
@@ -162,6 +181,10 @@ func (m *mockMonitorRepo) GetByUserID(ctx context.Context, userID uuid.UUID) ([]
 }
 
 func (m *mockMonitorRepo) GetByUsername(ctx context.Context, username string) ([]domain.Monitor, error) {
+	return nil, nil
+}
+
+func (m *mockMonitorRepo) GetBySlug(ctx context.Context, slug string) ([]domain.Monitor, error) {
 	return nil, nil
 }
 

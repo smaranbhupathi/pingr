@@ -57,6 +57,20 @@ func (r *monitorRepo) GetByUsername(ctx context.Context, username string) ([]dom
 	return r.scanMany(rows)
 }
 
+func (r *monitorRepo) GetBySlug(ctx context.Context, slug string) ([]domain.Monitor, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT `+monitorCols+`
+		FROM monitors m
+		JOIN users u ON u.id = m.user_id
+		WHERE u.status_page_slug=$1 AND m.is_active=true AND m.deleted_at IS NULL
+		ORDER BY m.created_at DESC`, slug,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.scanMany(rows)
+}
+
 // GetDue returns monitors that are due for checking based on their interval.
 // Uses interval arithmetic so the scheduler just calls this in a tight loop.
 func (r *monitorRepo) GetDue(ctx context.Context, region string) ([]domain.Monitor, error) {

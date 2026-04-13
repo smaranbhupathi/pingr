@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { monitorsApi, COMPONENT_STATUS_LABEL, COMPONENT_STATUS_DOT, type Monitor } from '../../api/monitors'
 import { componentsApi, type Component } from '../../api/components'
+import { userApi } from '../../api/user'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { AddMonitorModal } from './AddMonitorModal'
+import { SlugSetupModal } from './SlugSetupModal'
 import { Globe, Trash2, PauseCircle, PlayCircle, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react'
 import { usePageTitle } from '../../lib/usePageTitle'
 
@@ -24,7 +26,15 @@ export function DashboardPage() {
   usePageTitle('Monitors')
   const [showAdd, setShowAdd] = useState(false)
   const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null)
+  const [slugDismissed, setSlugDismissed] = useState(false)
   const queryClient = useQueryClient()
+
+  const { data: profile } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => userApi.me().then(r => r.data),
+  })
+
+  const showSlugModal = !slugDismissed && profile !== undefined && profile?.status_page_slug == null
 
   const { data: monitors = [], isLoading } = useQuery({
     queryKey: ['monitors'],
@@ -114,6 +124,7 @@ export function DashboardPage() {
         </div>
       )}
 
+      {showSlugModal && <SlugSetupModal onDone={() => setSlugDismissed(true)} />}
       {showAdd && <AddMonitorModal onClose={() => setShowAdd(false)} />}
       {editingMonitor && (
         <EditMonitorModal

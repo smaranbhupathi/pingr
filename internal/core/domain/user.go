@@ -7,18 +7,19 @@ import (
 )
 
 type User struct {
-	ID             uuid.UUID
-	Email          string
-	Username       string
-	PasswordHash   string
-	IsVerified     bool
-	VerifyToken    string
-	ResetToken     string
-	ResetExpiresAt *time.Time
-	PlanID         uuid.UUID
-	AvatarURL      *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID               uuid.UUID
+	Email            string
+	Username         string
+	PasswordHash     string
+	IsVerified       bool
+	VerifyToken      string
+	ResetToken       string
+	ResetExpiresAt   *time.Time
+	PlanID           uuid.UUID
+	AvatarURL        *string
+	StatusPageSlug   *string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type Plan struct {

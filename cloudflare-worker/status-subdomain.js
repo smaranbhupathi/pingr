@@ -36,6 +36,18 @@ export default {
       return fetch(request)
     }
 
+    // Static assets (JS, CSS, images) live at the root domain, not under /status/:username
+    // Pass them through directly so the browser can load them
+    const STATIC_PREFIXES = ['/assets/', '/favicon', '/icon', '/apple-touch']
+    const isStaticAsset = STATIC_PREFIXES.some(p => url.pathname.startsWith(p))
+
+    if (isStaticAsset) {
+      return fetch(`https://${ROOT_DOMAIN}${url.pathname}${url.search}`, {
+        headers: request.headers,
+        method:  request.method,
+      })
+    }
+
     // Build the target URL: getpingr.com/status/acme-corp
     // Preserve any path/query beyond the root (e.g. for future sub-pages)
     const targetPath = url.pathname === '/' ? '' : url.pathname

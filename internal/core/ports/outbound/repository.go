@@ -13,9 +13,11 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
+	GetBySlug(ctx context.Context, slug string) (*domain.User, error)
 	GetByVerifyToken(ctx context.Context, token string) (*domain.User, error)
 	GetByResetToken(ctx context.Context, token string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
+	SetSlug(ctx context.Context, userID uuid.UUID, slug string) error
 }
 
 type PlanRepository interface {
@@ -28,6 +30,7 @@ type MonitorRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Monitor, error)
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Monitor, error)
 	GetByUsername(ctx context.Context, username string) ([]domain.Monitor, error) // for public status page
+	GetBySlug(ctx context.Context, slug string) ([]domain.Monitor, error)         // for public status page via slug
 	GetDue(ctx context.Context, region string) ([]domain.Monitor, error)          // monitors due for checking
 	Update(ctx context.Context, monitor *domain.Monitor) error
 	UpdateComponentStatus(ctx context.Context, id uuid.UUID, status domain.ComponentStatus) error

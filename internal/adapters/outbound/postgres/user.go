@@ -39,6 +39,18 @@ func (r *userRepo) GetByUsername(ctx context.Context, username string) (*domain.
 	return r.scan(r.db.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE username=$1`, username))
 }
 
+func (r *userRepo) GetBySlug(ctx context.Context, slug string) (*domain.User, error) {
+	return r.scan(r.db.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE status_page_slug=$1`, slug))
+}
+
+func (r *userRepo) SetSlug(ctx context.Context, userID uuid.UUID, slug string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE users SET status_page_slug=$2, updated_at=now() WHERE id=$1`,
+		userID, slug,
+	)
+	return err
+}
+
 func (r *userRepo) GetByVerifyToken(ctx context.Context, token string) (*domain.User, error) {
 	return r.scan(r.db.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE verify_token=$1`, token))
 }
@@ -62,13 +74,15 @@ func (r *userRepo) Update(ctx context.Context, u *domain.User) error {
 }
 
 const userColumns = `id, email, username, password_hash, is_verified, verify_token,
-	COALESCE(reset_token,'') as reset_token, reset_expires_at, plan_id, avatar_url, created_at, updated_at`
+	COALESCE(reset_token,'') as reset_token, reset_expires_at, plan_id, avatar_url,
+	status_page_slug, created_at, updated_at`
 
 func (r *userRepo) scan(row pgx.Row) (*domain.User, error) {
 	var u domain.User
 	err := row.Scan(
 		&u.ID, &u.Email, &u.Username, &u.PasswordHash, &u.IsVerified, &u.VerifyToken,
-		&u.ResetToken, &u.ResetExpiresAt, &u.PlanID, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt,
+		&u.ResetToken, &u.ResetExpiresAt, &u.PlanID, &u.AvatarURL,
+		&u.StatusPageSlug, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("user scan: %w", err)

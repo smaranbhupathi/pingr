@@ -79,13 +79,36 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (*inboun
 	}
 
 	return &inbound.UserProfile{
-		ID:        user.ID,
-		Email:     user.Email,
-		Username:  user.Username,
-		Plan:      plan.Name,
-		AvatarURL: user.AvatarURL,
-		CreatedAt: user.CreatedAt,
+		ID:             user.ID,
+		Email:          user.Email,
+		Username:       user.Username,
+		Plan:           plan.Name,
+		AvatarURL:      user.AvatarURL,
+		StatusPageSlug: user.StatusPageSlug,
+		CreatedAt:      user.CreatedAt,
 	}, nil
+}
+
+var ErrSlugTaken = errors.New("slug already taken")
+
+func (s *userService) SetStatusPageSlug(ctx context.Context, userID uuid.UUID, slug string) error {
+	// Validate: lowercase letters, numbers, hyphens only; 3–50 chars
+	if len(slug) < 3 || len(slug) > 50 {
+		return fmt.Errorf("slug must be between 3 and 50 characters")
+	}
+	for _, c := range slug {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+			return fmt.Errorf("slug may only contain lowercase letters, numbers, and hyphens")
+		}
+	}
+
+	// Check uniqueness
+	existing, err := s.users.GetBySlug(ctx, slug)
+	if err == nil && existing != nil && existing.ID != userID {
+		return ErrSlugTaken
+	}
+
+	return s.users.SetSlug(ctx, userID, slug)
 }
 
 var ErrStorageNotConfigured = errors.New("storage not configured")

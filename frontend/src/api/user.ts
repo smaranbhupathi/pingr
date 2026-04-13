@@ -6,6 +6,7 @@ export interface UserProfile {
   username: string
   plan: string
   avatar_url: string | null
+  status_page_slug: string | null
   created_at: string
 }
 
@@ -34,6 +35,9 @@ export const userApi = {
 
   updateAvatar: (avatarUrl: string) =>
     client.patch('/me/avatar', { avatar_url: avatarUrl }),
+
+  setSlug: (slug: string) =>
+    client.put('/me/slug', { slug }),
 
   listAlertChannels: () =>
     client.get<AlertChannel[]>('/alert-channels'),

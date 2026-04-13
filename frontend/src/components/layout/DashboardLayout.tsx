@@ -53,7 +53,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <>
               <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
               <a
-                href={`/status/${profile.username}`}
+                href={
+                  profile.status_page_slug
+                    ? `https://${profile.status_page_slug}.getpingr.com`
+                    : `/status/${profile.username}`
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"

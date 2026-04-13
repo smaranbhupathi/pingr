@@ -9,12 +9,13 @@ import (
 )
 
 type UserProfile struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Username  string    `json:"username"`
-	Plan      string    `json:"plan"`
-	AvatarURL *string   `json:"avatar_url"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             uuid.UUID `json:"id"`
+	Email          string    `json:"email"`
+	Username       string    `json:"username"`
+	Plan           string    `json:"plan"`
+	AvatarURL      *string   `json:"avatar_url"`
+	StatusPageSlug *string   `json:"status_page_slug"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // AvatarUploadResult is returned by AvatarUploadURL.
@@ -112,6 +113,7 @@ type UpdateComponentInput struct {
 
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*UserProfile, error)
+	SetStatusPageSlug(ctx context.Context, userID uuid.UUID, slug string) error
 	// AvatarUploadURL generates a short-lived presigned PUT URL for the browser
 	// to upload an avatar directly to object storage (S3/R2/MinIO).
 	AvatarUploadURL(ctx context.Context, userID uuid.UUID, contentType string) (*AvatarUploadResult, error)
