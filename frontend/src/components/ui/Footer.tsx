@@ -1,12 +1,12 @@
 export function Footer() {
   return (
-    <footer className="border-t border-gray-100 py-6 px-4">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-400">
+    <footer className="py-4 px-6 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shrink-0">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-500">
         <span>© {new Date().getFullYear()} Pingr. All rights reserved.</span>
-        <div className="flex items-center gap-5">
-          <a href="#" className="hover:text-gray-600 transition-colors">Privacy</a>
-          <a href="#" className="hover:text-gray-600 transition-colors">Terms</a>
-          <a href="#" className="hover:text-gray-600 transition-colors">Status</a>
+        <div className="flex items-center gap-4">
+          <a href="/privacy" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Privacy Policy</a>
+          <a href="/terms" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Terms of Use</a>
+          <a href="https://smaran-pingr.getpingr.com" target="_blank" rel="noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Status</a>
         </div>
       </div>
     </footer>

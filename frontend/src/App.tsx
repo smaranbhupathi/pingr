@@ -20,6 +20,8 @@ import { IncidentDetailPage } from './pages/dashboard/IncidentDetail'
 import { ComponentsPage } from './pages/dashboard/ComponentsPage'
 import { StatusPage } from './pages/status/StatusPage'
 import { DocsPage } from './pages/Docs'
+import { PrivacyPage } from './pages/Privacy'
+import { TermsPage } from './pages/Terms'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +73,8 @@ export default function App() {
             {/* Public */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/docs" element={<DocsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/status/:username" element={<StatusPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
 

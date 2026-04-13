@@ -82,8 +82,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <main className="px-8 py-8">
             {children}
           </main>
-          <Footer />
         </div>
+
+        {/* Footer — outside scroll area so it stays at the bottom */}
+        <Footer />
       </div>
     </div>
   )
