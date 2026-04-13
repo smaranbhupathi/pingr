@@ -6,7 +6,6 @@ export function Footer() {
         <div className="flex items-center gap-4">
           <a href="/privacy" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Privacy Policy</a>
           <a href="/terms" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Terms of Use</a>
-          <a href="https://smaran-pingr.getpingr.com" target="_blank" rel="noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Status</a>
         </div>
       </div>
     </footer>
