@@ -4,7 +4,7 @@ Open-source uptime monitoring and public status pages.
 
 Add a URL, pick a check interval, and Pingr will watch it around the clock — alerting you on Discord, Slack, or email the moment it goes down, and again when it recovers. Share a public status page with your team or customers so everyone always knows what's happening.
 
-**Live demo:** https://pingr.pages.dev
+**Live demo:** https://getpingr.com
 
 ---
 

@@ -111,7 +111,11 @@ function LoggedInHome() {
 
           {profile && (
             <a
-              href={`/status/${profile.username}`}
+              href={
+                profile.status_page_slug
+                  ? `https://${profile.status_page_slug}.getpingr.com`
+                  : `/status/${profile.username}`
+              }
               target="_blank"
               rel="noreferrer"
               className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
@@ -122,7 +126,11 @@ function LoggedInHome() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">Your status page</p>
-                  <p className="text-xs text-gray-400">pingr.app/status/{profile.username}</p>
+                  <p className="text-xs text-gray-400">
+                    {profile.status_page_slug
+                      ? `${profile.status_page_slug}.getpingr.com`
+                      : `getpingr.com/status/${profile.username}`}
+                  </p>
                 </div>
               </div>
               <ExternalLink size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
@@ -175,12 +183,14 @@ function GuestHome() {
           >
             Start monitoring free →
           </Link>
-          <Link
-            to="/status/pingr"
+          <a
+            href="https://smaran-pingr.getpingr.com"
+            target="_blank"
+            rel="noreferrer"
             className="text-gray-500 hover:text-gray-700 text-sm underline"
           >
             See example status page
-          </Link>
+          </a>
         </div>
         <p className="text-xs text-gray-400 mt-4">5 monitors free · No setup required</p>
       </section>
@@ -205,7 +215,7 @@ function GuestHome() {
             {
               icon: <Globe className="text-indigo-600" size={24} />,
               title: 'Public status page',
-              desc: 'Share pingr.app/status/yourname with your users. Build trust through transparency.',
+              desc: 'Share yourname.getpingr.com with your users. Build trust through transparency.',
             },
             {
               icon: <BarChart2 className="text-indigo-600" size={24} />,
