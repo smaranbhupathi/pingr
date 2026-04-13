@@ -5,7 +5,7 @@ import { DashboardLayout } from '../components/layout/DashboardLayout'
 import {
   Activity, AlertTriangle, Bell, CheckCircle, ChevronRight, Clock,
   Download, ExternalLink, Globe, Layers, Mail, PauseCircle, PlayCircle,
-  Plus, ShieldCheck, Upload, Zap,
+  Plus, Upload, Zap,
 } from 'lucide-react'
 
 const sections = [
