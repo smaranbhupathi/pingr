@@ -8,6 +8,19 @@ Add a URL, pick a check interval, and Pingr will watch it around the clock — a
 
 ---
 
+## Screenshots
+
+![Dashboard](docs/screenshots/dashboard.png)
+*Monitor dashboard — all your uptime monitors at a glance with quick actions*
+
+![Status Page](docs/screenshots/status-page.png)
+*Public status page — share real-time service health with your team or customers*
+
+![Monitor Detail](docs/screenshots/monitor-detail.png)
+*Monitor detail — response time graph, 90-day uptime history, incidents, and alert channels*
+
+---
+
 ## Features
 
 - **HTTP uptime monitoring** — configurable check intervals (30 s → 24 h)
