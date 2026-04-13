@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { monitorsApi, COMPONENT_STATUS_LABEL, COMPONENT_STATUS_COLOR, COMPONENT_STATUS_DOT, type MonitorDetail, type DailyUptimeStat, type ComponentStatus } from '../../api/monitors'
 import type { Incident, IncidentStatus } from '../../api/incidents'
 import { format } from '../../lib/format'
@@ -233,6 +234,8 @@ function StatusShell({ username, children }: { username: string; children: React
 export function StatusPage({ slugOverride }: { slugOverride?: string }) {
   const { username } = useParams<{ username: string }>()
   const slug = slugOverride ?? username ?? ''
+
+  usePageTitle(slug ? `${slug} — Status` : 'Status Page')
 
   const { data: monitors = [], isLoading, isError } = useQuery({
     queryKey: ['status', slug],

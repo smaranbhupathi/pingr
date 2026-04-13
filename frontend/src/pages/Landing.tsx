@@ -25,52 +25,52 @@ function LoggedInHome() {
   const total = monitors.length
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       {/* Top bar */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-        <span className="text-xl font-bold text-indigo-600">Pingr</span>
+      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/50 px-6 py-3 flex items-center justify-between">
+        <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Pingr</span>
         <UserMenu />
       </nav>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-12">
         {/* Greeting */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Welcome back{profile?.username ? `, ${profile.username}` : ''}
           </h1>
-          <p className="text-gray-500 mt-1">Here's a quick overview of your monitoring.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Here's a quick overview of your monitoring.</p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-10">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-500 mb-1">Total monitors</p>
-            <p className="text-4xl font-bold text-gray-900">{total}</p>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700/50 p-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total monitors</p>
+            <p className="text-4xl font-bold text-gray-900 dark:text-white">{total}</p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-500 mb-1">Up</p>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700/50 p-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Up</p>
             <p className="text-4xl font-bold text-green-600">{up}</p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-500 mb-1">Down</p>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700/50 p-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Down</p>
             <p className="text-4xl font-bold text-red-500">{down}</p>
           </div>
         </div>
 
         {/* Quick actions */}
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Quick actions</h2>
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">Quick actions</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           <Link
             to="/dashboard"
-            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/50 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-sm transition group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center">
-                <Activity size={18} className="text-indigo-600" />
+              <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                <Activity size={18} className="text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">View monitors</p>
-                <p className="text-xs text-gray-400">See all your monitors</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">View monitors</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">See all your monitors</p>
               </div>
             </div>
             <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
@@ -79,15 +79,15 @@ function LoggedInHome() {
           <Link
             to="/dashboard"
             state={{ openAdd: true }}
-            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/50 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-sm transition group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
-                <Plus size={18} className="text-green-600" />
+              <div className="w-9 h-9 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                <Plus size={18} className="text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Add a monitor</p>
-                <p className="text-xs text-gray-400">Start monitoring a new URL</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Add a monitor</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Start monitoring a new URL</p>
               </div>
             </div>
             <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
@@ -95,15 +95,15 @@ function LoggedInHome() {
 
           <Link
             to="/dashboard/alert-channels"
-            className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/50 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-sm transition group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center">
-                <Bell size={18} className="text-amber-500" />
+              <div className="w-9 h-9 bg-amber-50 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                <Bell size={18} className="text-amber-500 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Alert channels</p>
-                <p className="text-xs text-gray-400">Manage where you get notified</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Alert channels</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Manage where you get notified</p>
               </div>
             </div>
             <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-500 transition" />
@@ -118,15 +118,15 @@ function LoggedInHome() {
               }
               target="_blank"
               rel="noreferrer"
-              className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 hover:shadow-sm transition group"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/50 rounded-xl p-5 flex items-center justify-between hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-sm transition group"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-sky-50 rounded-lg flex items-center justify-center">
-                  <Globe size={18} className="text-sky-500" />
+                <div className="w-9 h-9 bg-sky-50 dark:bg-sky-900/30 rounded-lg flex items-center justify-center">
+                  <Globe size={18} className="text-sky-500 dark:text-sky-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Your status page</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">Your status page</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
                     {profile.status_page_slug
                       ? `${profile.status_page_slug}.getpingr.com`
                       : `getpingr.com/status/${profile.username}`}
