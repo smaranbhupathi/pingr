@@ -3,6 +3,7 @@ package http
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -111,10 +112,20 @@ func NewRouter(
 // allowedOrigin should be "*" in dev and your exact frontend URL in prod
 // (e.g. "https://pingr.yourdomain.com"). Locking to a specific origin in prod
 // prevents other websites from making authenticated requests on behalf of your users.
+//
+// In addition to the configured allowedOrigin, any subdomain of getpingr.com is
+// also allowed — status pages are served from username.getpingr.com and the
+// React app on those subdomains needs to reach the API.
 func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			origin := r.Header.Get("Origin")
+			allowed := allowedOrigin
+			if allowedOrigin == "*" || origin == allowedOrigin ||
+				strings.HasSuffix(origin, ".getpingr.com") {
+				allowed = origin
+			}
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			if r.Method == http.MethodOptions {
