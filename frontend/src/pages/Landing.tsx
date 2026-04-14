@@ -185,8 +185,6 @@ function GuestHome() {
           </Link>
           <a
             href="https://smaran-pingr.getpingr.com"
-            target="_blank"
-            rel="noreferrer"
             className="text-gray-500 hover:text-gray-700 text-sm underline"
           >
             See example status page
